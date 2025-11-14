@@ -1,0 +1,38 @@
+{
+  "generated_at": "2024-05-20T00:00:00Z",
+  "documents": [
+    {
+      "app": "sample-app",
+      "type": "terms",
+      "language": "it_IT",
+      "version": "v001",
+      "released_on": "2024-05-20",
+      "filename": "sample-app_terms_v001_2024-05-20_it_IT.pdf",
+      "pdf_path": "docs/sample-app/terms/sample-app_terms_v001_2024-05-20_it_IT.pdf",
+      "source_path": "sources/sample-app/terms/sample-app_terms_v001_2024-05-20_it_IT.docx",
+      "checksum": "sha256:REPLACE_ME"
+    },
+    {
+      "app": "sample-app",
+      "type": "privacy",
+      "language": "en_GB",
+      "version": "v001",
+      "released_on": "2024-05-20",
+      "filename": "sample-app_privacy_v001_2024-05-20_en_GB.pdf",
+      "pdf_path": "docs/sample-app/privacy/sample-app_privacy_v001_2024-05-20_en_GB.pdf",
+      "source_path": "sources/sample-app/privacy/sample-app_privacy_v001_2024-05-20_en_GB.docx",
+      "checksum": "sha256:REPLACE_ME"
+    },
+    {
+      "app": "sample-app",
+      "type": "cookie",
+      "language": "it_IT",
+      "version": "v001",
+      "released_on": "2024-05-20",
+      "filename": "sample-app_cookie_v001_2024-05-20_it_IT.pdf",
+      "pdf_path": "docs/sample-app/cookie/sample-app_cookie_v001_2024-05-20_it_IT.pdf",
+      "source_path": "sources/sample-app/cookie/sample-app_cookie_v001_2024-05-20_it_IT.docx",
+      "checksum": "sha256:REPLACE_ME"
+    }
+  ]
+}

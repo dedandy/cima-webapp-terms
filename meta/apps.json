@@ -1,0 +1,8 @@
+{
+  "remote_manifest_url": "https://raw.githubusercontent.com/CIMAFoundation/ngx-cima-landing-pages/main/webpages-manifest.json",
+  "apps": [
+    { "id": "sample-app", "label": "Sample App" },
+    { "id": "cima-landing", "label": "CIMA Landing" },
+    { "id": "cima-portal", "label": "CIMA Portal" }
+  ]
+}
