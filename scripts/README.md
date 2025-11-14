@@ -1,6 +1,6 @@
 # Document Processing Helper
 
-`scripts/process-doc.mjs` orchestrates the full lifecycle for a legal document: it renames the editable source, exports/moves the PDF, keeps `meta/manifest.json` in sync, refreshes `index.md`, and validates the target app list against `webpages-maniofest.json` from `CIMAFoundation/ngx-cima-landing-pages`.
+`scripts/process-doc.mjs` orchestrates the full lifecycle for a legal document: it renames the editable source, exports/moves the PDF, keeps `meta/manifest.json` in sync, refreshes `index.md`, and validates the target app list against `webpages-manifest.json` from `CIMAFoundation/ngx-cima-landing-pages`.
 
 ## Interactive Usage (recommended)
 ```bash
@@ -34,6 +34,6 @@ node scripts/process-doc.mjs --reindex true
 ```
 
 ## Maintaining the App Catalog
-- `meta/apps.json` now references `https://raw.githubusercontent.com/CIMAFoundation/ngx-cima-landing-pages/main/webpages-manifest.json` via `remote_manifest_url`.
-- Each time the script runs it attempts to download that manifest, extract each entry’s `slug`, and overwrite the local `apps` array with the current list; the file on disk stays up to date for offline sessions.
-- If the fetch fails (no network/private repo), the cached `apps` array in `meta/apps.json` is used as the fallback, so commit that file whenever the remote list changes to share it with collaborators.
+- Add/update the `vendor/ngx-cima-landing-pages` submodule (sparse checkout works well) so `vendor/ngx-cima-landing-pages/webpages-manifest.json` exists locally.
+- The script first parses that local manifest, extracts all `slug` values, and rewrites the `apps` array inside `meta/apps.json`—this keeps the cache current and lets the prompts work offline.
+- If the local file is missing, the script falls back to `remote_manifest_url` inside `meta/apps.json` (defaulting to the same GitHub raw URL). When both sources fail, the cached `apps` array in `meta/apps.json` is used, so commit that file after successful syncs to share the latest list with teammates.

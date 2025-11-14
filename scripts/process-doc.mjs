@@ -12,6 +12,7 @@ const repoRoot = path.resolve(path.join(path.dirname(fileURLToPath(import.meta.u
 const manifestPath = path.join(repoRoot, 'meta', 'manifest.json');
 const appsPath = path.join(repoRoot, 'meta', 'apps.json');
 const indexPath = path.join(repoRoot, 'index.md');
+const localManifestPath = path.join(repoRoot, 'vendor', 'ngx-cima-landing-pages', 'webpages-manifest.json');
 const defaultLanguages = ['it_IT', 'en_GB', 'en_EN', 'fr_FR'];
 const docTypes = ['terms', 'privacy', 'cookie'];
 
@@ -130,6 +131,16 @@ async function saveAppsConfig(config) {
   await fs.writeFile(appsPath, `${JSON.stringify(config, null, 2)}\n`);
 }
 
+async function fileExists(filePath) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch (err) {
+    if (err.code === 'ENOENT') return false;
+    throw err;
+  }
+}
+
 async function loadAppCatalog() {
   let config = { apps: [] };
   try {
@@ -140,21 +151,37 @@ async function loadAppCatalog() {
   }
 
   let fallback = config.apps && config.apps.length ? config.apps : [{ id: 'sample-app', label: 'Sample App' }];
-  let remote = [];
-  if (config.remote_manifest_url) {
+  let resolvedApps = [];
+
+  if (await fileExists(localManifestPath)) {
     try {
-      const data = await fetchJson(config.remote_manifest_url);
-      remote = extractRemoteApps(data);
-      if (remote.length) {
-        config.apps = remote;
-        await saveAppsConfig(config);
-        fallback = remote;
-      } else {
-        console.warn('Remote manifest fetched but no slugs found. Falling back to local list.');
+      const raw = await fs.readFile(localManifestPath, 'utf-8');
+      const data = JSON.parse(raw);
+      resolvedApps = extractRemoteApps(data);
+      if (!resolvedApps.length) {
+        console.warn('Local webpages-manifest.json found but no slugs extracted.');
       }
     } catch (err) {
-      console.warn(`Unable to fetch remote apps: ${err.message}. Using local fallback list.`);
+      console.warn(`Failed to parse local webpages-manifest.json: ${err.message}`);
     }
+  }
+
+  if (!resolvedApps.length && config.remote_manifest_url) {
+    try {
+      const data = await fetchJson(config.remote_manifest_url);
+      resolvedApps = extractRemoteApps(data);
+      if (!resolvedApps.length) {
+        console.warn('Remote manifest fetched but no slugs found.');
+      }
+    } catch (err) {
+      console.warn(`Unable to fetch remote apps: ${err.message}.`);
+    }
+  }
+
+  if (resolvedApps.length) {
+    config.apps = resolvedApps;
+    fallback = resolvedApps;
+    await saveAppsConfig(config);
   }
 
   if (!fallback.length) {
