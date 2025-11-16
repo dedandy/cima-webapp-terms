@@ -13,6 +13,8 @@ const manifestPath = path.join(repoRoot, 'meta', 'manifest.json');
 const appsPath = path.join(repoRoot, 'meta', 'apps.json');
 const indexPath = path.join(repoRoot, 'index.md');
 const localManifestPath = path.join(repoRoot, 'vendor', 'ngx-cima-landing-pages', 'webpages-manifest.json');
+const pagesConvertibleExt = new Set(['.pages', '.doc', '.docx', '.rtf', '.rtfd']);
+let pagesAvailabilityCache = null;
 const defaultLanguages = ['it_IT', 'en_GB', 'en_EN', 'fr_FR'];
 const docTypes = ['terms', 'privacy', 'cookie'];
 
@@ -279,11 +281,18 @@ async function promptForSourceFile(existingSources) {
   return manual;
 }
 
-async function convertToPdf(sourcePath, tempPdfPath) {
+function escapeForAppleScript(value) {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+async function convertPagesToPdf(sourcePath, targetPdfPath) {
+  await ensureDir(path.dirname(targetPdfPath));
+  const script = `set sourceFile to POSIX file "${escapeForAppleScript(sourcePath)}"\nset destFile to POSIX file "${escapeForAppleScript(targetPdfPath)}"\ntell application \"Pages\"\n  set docRef to open sourceFile\n  export docRef to destFile as PDF\n  close docRef saving no\nend tell`;
   return new Promise((resolve, reject) => {
-    const child = execFile('textutil', ['-convert', 'pdf', sourcePath, '-output', tempPdfPath], (error) => {
+    const child = execFile('osascript', ['-e', script], (error, stdout, stderr) => {
       if (error) {
-        reject(error);
+        const message = stderr?.trim() || error.message;
+        reject(new Error(message));
       } else {
         resolve();
       }
@@ -292,28 +301,73 @@ async function convertToPdf(sourcePath, tempPdfPath) {
   });
 }
 
-async function obtainPdf(sourcePath) {
-  const { ext, dir, name } = path.parse(sourcePath);
-  const manualNeeded = ext === '.pages';
-  if (!manualNeeded) {
-    try {
-      const tempPdf = path.join(dir, `${name}.pdf`);
-      await convertToPdf(sourcePath, tempPdf);
-      console.log(`PDF generated via textutil -> ${tempPdf}`);
-      return tempPdf;
-    } catch (err) {
-      console.log('Automatic PDF conversion failed. Please provide an exported PDF.');
+async function isPagesAvailable() {
+  if (pagesAvailabilityCache !== null) return pagesAvailabilityCache;
+  if (process.platform !== 'darwin') {
+    pagesAvailabilityCache = false;
+    return pagesAvailabilityCache;
+  }
+  pagesAvailabilityCache = await new Promise((resolve) => {
+    const child = execFile('osascript', ['-e', 'id of application "Pages"'], (error) => {
+      resolve(!error);
+    });
+    child.on('error', () => resolve(false));
+  });
+  return pagesAvailabilityCache;
+}
+
+async function tryAutoConversion(sourcePath, preferredOutputPath) {
+  const ext = path.extname(sourcePath).toLowerCase();
+  if (!pagesConvertibleExt.has(ext)) return false;
+  if (!(await isPagesAvailable())) {
+    if (process.platform === 'darwin') {
+      console.log('Pages.app not detected. Launch Pages at least once to enable automatic exports.');
     }
-  } else {
-    console.log('Pages files cannot be auto-converted. Please export a PDF manually first.');
+    return false;
   }
-  const manualPath = await ask('Path to the exported PDF', '');
-  if (!manualPath) {
-    throw new Error('PDF path is required.');
+  try {
+    await convertPagesToPdf(sourcePath, preferredOutputPath);
+    console.log(`PDF generated via Pages automation -> ${preferredOutputPath}`);
+    return true;
+  } catch (err) {
+    console.log(`Automatic Pages export failed (${err.message}).`);
+    return false;
   }
-  const resolved = path.resolve(manualPath);
-  await fs.access(resolved);
-  return resolved;
+}
+
+async function promptForPdfPath(initialPath) {
+  let current = initialPath;
+  while (true) {
+    const manualPathInput = await ask(
+      'Path to the exported PDF (export now, then press Enter to re-check)',
+      current
+    );
+    if (!manualPathInput) {
+      throw new Error('PDF path is required.');
+    }
+    const resolved = path.isAbsolute(manualPathInput)
+      ? manualPathInput
+      : path.resolve(repoRoot, manualPathInput);
+    if (await fileExists(resolved)) {
+      return resolved;
+    }
+    console.log(`File not found: ${resolved}`);
+    console.log('Save the PDF to that path, then press Enter to try again or provide a different path.');
+    current = manualPathInput;
+  }
+}
+
+async function obtainPdf(sourcePath, preferredOutputPath) {
+  if (await tryAutoConversion(sourcePath, preferredOutputPath)) {
+    return preferredOutputPath;
+  }
+  await ensureDir(path.dirname(preferredOutputPath));
+  console.log(`Please export the PDF manually to: ${preferredOutputPath}`);
+  return promptForPdfPath(preferredOutputPath);
+}
+
+function buildBaseName(app, type, version, date, lang) {
+  return `${app}_${type}_${version}_${date}_${lang}`;
 }
 
 async function updateManifest(manifest, entry) {
@@ -341,26 +395,37 @@ async function interactiveFlow(manifest, apps) {
   const dateDefault = formatDateISO(stats.mtime);
   const date = await ask('Release date (YYYY-MM-DD)', dateDefault);
   const version = await ask('Version', suggestVersion(manifest, app, type, lang));
-  const pdfPath = await obtainPdf(absSource);
-  const args = { app, type, version, date, lang, src: absSource, pdf: path.resolve(pdfPath) };
+  const baseName = buildBaseName(app, type, version, date, lang);
+  const targetDocsDir = path.join(repoRoot, 'docs', app, type);
+  const preferredPdfPath = path.join(targetDocsDir, `${baseName}.pdf`);
+  const pdfPath = await obtainPdf(absSource, preferredPdfPath);
+  const args = { app, type, version, date, lang, src: absSource, pdf: path.resolve(pdfPath), baseName };
   await processDocument(args, manifest, apps);
 }
 
-async function movePreserving(from, to) {
+async function copyPreserving(from, to) {
   const resolvedFrom = path.resolve(from);
   const resolvedTo = path.resolve(to);
   if (resolvedFrom === resolvedTo) return;
   await ensureDir(path.dirname(resolvedTo));
+  await fs.copyFile(resolvedFrom, resolvedTo);
+}
+
+async function renameOriginalSource(originalPath, baseName) {
+  const resolved = path.resolve(originalPath);
+  const dir = path.dirname(resolved);
+  const ext = path.extname(resolved);
+  const target = path.join(dir, `${baseName}${ext || '.docx'}`);
+  if (target === resolved) return;
   try {
-    await fs.rename(resolvedFrom, resolvedTo);
+    await fs.access(target);
+    console.log(`Original source rename skipped because ${path.relative(repoRoot, target)} already exists.`);
+    return;
   } catch (err) {
-    if (err.code === 'EXDEV') {
-      await fs.copyFile(resolvedFrom, resolvedTo);
-      await fs.unlink(resolvedFrom);
-    } else {
-      throw err;
-    }
+    if (err.code !== 'ENOENT') throw err;
   }
+  await fs.rename(resolved, target);
+  console.log(`Original source renamed to ${path.relative(repoRoot, target)}`);
 }
 
 async function writeIndexFromManifest(manifest, apps) {
@@ -401,7 +466,7 @@ async function writeIndexFromManifest(manifest, apps) {
 
 async function processDocument(args, manifest, apps) {
   const { app, type, version, date, lang } = args;
-  const baseName = `${app}_${type}_${version}_${date}_${lang}`;
+  const baseName = args.baseName || buildBaseName(app, type, version, date, lang);
   const sourceExt = path.extname(args.src) || '.docx';
   const targetSourceDir = path.join(repoRoot, 'sources', app, type);
   const targetDocsDir = path.join(repoRoot, 'docs', app, type);
@@ -410,8 +475,9 @@ async function processDocument(args, manifest, apps) {
 
   await ensureDir(targetSourceDir);
   await ensureDir(targetDocsDir);
-  await movePreserving(args.src, targetSourcePath);
-  await movePreserving(args.pdf, targetPdfPath);
+  await copyPreserving(args.src, targetSourcePath);
+  await copyPreserving(args.pdf, targetPdfPath);
+  await renameOriginalSource(args.src, baseName);
 
   const checksum = await computeChecksum(targetPdfPath);
   const entry = {

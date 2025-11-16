@@ -1,5 +1,5 @@
 {
-  "generated_at": "2024-05-20T00:00:00Z",
+  "generated_at": "2025-11-14T15:09:11.701Z",
   "documents": [
     {
       "app": "sample-app",
@@ -33,6 +33,17 @@
       "pdf_path": "docs/sample-app/cookie/sample-app_cookie_v001_2024-05-20_it_IT.pdf",
       "source_path": "sources/sample-app/cookie/sample-app_cookie_v001_2024-05-20_it_IT.docx",
       "checksum": "sha256:REPLACE_ME"
+    },
+    {
+      "app": "bricks-dev",
+      "type": "cookie",
+      "language": "it_IT",
+      "version": "v004",
+      "released_on": "2025-11-14",
+      "filename": "bricks-dev_cookie_v004_2025-11-14_it_IT.pdf",
+      "pdf_path": "docs/bricks-dev/cookie/bricks-dev_cookie_v004_2025-11-14_it_IT.pdf",
+      "source_path": "sources/bricks-dev/cookie/bricks-dev_cookie_v004_2025-11-14_it_IT.pages",
+      "checksum": "sha256:7f8e832740a858fff318e3994f762d0b517dc2ecbaa6de40481b12c5cecd6ab2"
     }
   ]
 }

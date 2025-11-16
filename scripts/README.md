@@ -10,8 +10,8 @@ Workflow:
 1. **Select draft** – choose a file from `sources/` or provide a custom path.
 2. **Pick metadata** – the script fetches the latest `slug` list from `meta/apps.json.remote_manifest_url` (fallbacks to the `apps` array) and asks for the app + type (`cookie|privacy|terms`) and language (`it_IT`, `en_GB`, `fr_FR`, ...).
 3. **Versioning** – default date comes from the file’s last modified time; version suggestion is the next increment over the current manifest entry for that app/type/lang.
-4. **PDF export** – tries converting via `textutil` (works for doc/docx/rtf). If conversion fails—or for `.pages` files—you are prompted for the manually exported PDF path.
-5. **Rename & move** – files are moved into `sources/<app>/<type>/` and `docs/<app>/<type>/` with the canonical `app_type_v###_YYYY-MM-DD_lang.ext` naming (language always last).
+4. **PDF export** – attempts automatic conversion through Pages.app (via AppleScript) for `.pages`, `.doc`, `.docx`, `.rtf`, `.rtfd`. macOS will ask for permission the first time; grant it so the script can open/export the file and save the PDF directly inside `docs/<app>/<type>/`. When conversion isn’t possible (e.g., Pages not installed or unsupported formats like `.gdoc`), you’re prompted for the PDF path—just export it to the suggested destination (or provide another path) and the script will wait until the file appears.
+5. **Rename & move** – the original draft is renamed in place using the canonical filename, while copies are written to `sources/<app>/<type>/` and `docs/<app>/<type>/` (same base name, language always last).
 6. **Registry update** – `meta/manifest.json` is updated with checksum + metadata, and `index.md` is regenerated from the manifest so the README-style table always reflects the latest PDFs.
 
 ## Non-Interactive Mode
@@ -26,6 +26,13 @@ node scripts/process-doc.mjs \
   --src /path/to/draft.docx \
   --pdf /path/to/export.pdf
 ```
+
+## Auto-stage Updated Files
+If you want the generated PDFs, sources, `manifest.json`, `apps.json`, and `index.md` to be staged automatically, run the wrapper script instead:
+```bash
+scripts/process-doc-with-git.sh
+```
+It forwards every argument to `process-doc.mjs` and, on success, executes `git add` on the relevant paths.
 
 ## Rebuild the Index Only
 If you edit `meta/manifest.json` manually, regenerate `index.md` without moving files:

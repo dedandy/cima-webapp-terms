@@ -2,7 +2,13 @@
 
 This file is auto-generated. File naming pattern: `app_type_v###_YYYY-MM-DD_lang.ext` with language trailing. PDFs live in `docs/<app>/<type>/`, sources in `sources/<app>/<type>/`. Run `node scripts/process-doc.mjs --reindex true` to rebuild.
 
-## Sample App (sample-app)
+## bricks-dev (bricks-dev)
+
+| Type | Version | Date | Language | PDF Link | Source Link |
+|------|---------|------|----------|----------|-------------|
+| cookie | v004 | 2025-11-14 | it_IT | [PDF](docs/bricks-dev/cookie/bricks-dev_cookie_v004_2025-11-14_it_IT.pdf) | [Source](sources/bricks-dev/cookie/bricks-dev_cookie_v004_2025-11-14_it_IT.pages) |
+
+## sample-app (sample-app)
 
 | Type | Version | Date | Language | PDF Link | Source Link |
 |------|---------|------|----------|----------|-------------|
