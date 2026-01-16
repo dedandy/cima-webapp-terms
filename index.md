@@ -6,7 +6,7 @@ This file is auto-generated. File naming pattern: `app_type_v###_YYYY-MM-DD_lang
 
 | Type | Version | Date | Language | PDF Link | Source Link |
 |------|---------|------|----------|----------|-------------|
-| cookie | v004 | 2025-11-14 | it_IT | [PDF](docs/bricks-dev/cookie/bricks-dev_cookie_v004_2025-11-14_it_IT.pdf) | [Source](sources/bricks-dev/cookie/bricks-dev_cookie_v004_2025-11-14_it_IT.pages) |
+| cookie | v005 | 2025-11-16 | it_IT | [PDF](docs/bricks-dev/cookie/bricks-dev_cookie_v005_2025-11-16_it_IT.pdf) | [Source](sources/bricks-dev/cookie/bricks-dev_cookie_v005_2025-11-16_it_IT.pages) |
 
 ## sample-app (sample-app)
 
