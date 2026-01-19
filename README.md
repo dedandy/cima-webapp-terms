@@ -3,6 +3,11 @@
 ## IT
 Repository per gestire sorgenti WYSIWYG, metadati e asset PDF dei documenti legali (terms/privacy/cookie) per piattaforma e lingua.
 
+### Quick Start
+1. Copia i file grezzi in `incoming/`.
+2. Esegui `node scripts/process-doc.mjs --incoming`.
+3. Verifica `platforms/`, `release-assets/`, `latest.json`, poi fai commit.
+
 ### Struttura
 - `platforms/<platform>/<doctype>/<lang>/<dd-mm-yyyy>/source/` contiene il file sorgente rinominato con lo standard.
 - `platforms/<platform>/<doctype>/<lang>/<dd-mm-yyyy>/meta.yml` contiene metadati per audit, release e tracciabilita'.
@@ -36,6 +41,11 @@ Il file `meta/apps.json` viene aggiornato dallo script leggendo il manifest in `
 
 ## EN
 Repository to manage WYSIWYG sources, metadata, and PDF assets for legal documents (terms/privacy/cookie) per platform and language.
+
+### Quick Start
+1. Drop raw files into `incoming/`.
+2. Run `node scripts/process-doc.mjs --incoming`.
+3. Verify `platforms/`, `release-assets/`, `latest.json`, then commit.
 
 ### Structure
 - `platforms/<platform>/<doctype>/<lang>/<dd-mm-yyyy>/source/` stores the source file renamed with the standard pattern.
