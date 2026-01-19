@@ -4,16 +4,12 @@
 Repository per gestire sorgenti WYSIWYG, metadati e asset PDF dei documenti legali (terms/privacy/cookie) per piattaforma e lingua.
 
 ### Struttura
-- `platforms/<platform>/<doctype>/<lang>/<dd-mm-yyyy>/source/`
-  Contiene il file sorgente rinominato con lo standard.
-- `platforms/<platform>/<doctype>/<lang>/<dd-mm-yyyy>/meta.yml`
-  Metadati per audit, release e tracciabilita.
-- `release-assets/<platform>/<doctype>/<lang>/<dd-mm-yyyy>/`
-  Contiene i PDF generati (da CI o manualmente).
+- `platforms/<platform>/<doctype>/<lang>/<dd-mm-yyyy>/source/` contiene il file sorgente rinominato con lo standard.
+- `platforms/<platform>/<doctype>/<lang>/<dd-mm-yyyy>/meta.yml` contiene metadati per audit, release e tracciabilita'.
+- `release-assets/<platform>/<doctype>/<lang>/<dd-mm-yyyy>/` contiene i PDF generati (da CI o manualmente).
 
 ### Naming (sorgenti e PDF)
-Formato:
-`<platform>_<doctype>_<dd-mm-yyyy>_<lang>_v###.<ext>`
+Formato: `<platform>_<doctype>_<dd-mm-yyyy>_<lang>_v###.<ext>`
 
 Esempi:
 - `bricks-dev_terms_16-11-2025_it_IT_v001.docx`
@@ -31,30 +27,23 @@ Esempi:
 - PAGES: conversione manuale (Pages.app), poi salvataggio nel percorso suggerito dallo script.
 
 ### Latest per le webapp (JSON)
-`latest.json` contiene l’ultima versione per app/type/lang. Le webapp possono leggerlo per risolvere sempre il PDF piu recente.
-Se serve rigenerarlo: `node scripts/generate-latest.mjs`.
+`latest.json` contiene l'ultima versione per app/type/lang. Le webapp possono leggerlo per risolvere sempre il PDF piu' recente.  
+Per rigenerarlo: `node scripts/generate-latest.mjs`.
 
 ### Catalogo app (slugs)
 Il file `meta/apps.json` viene aggiornato dallo script leggendo il manifest in `vendor/ngx-cima-landing-pages/webpages-manifest.json`
 (submodule con sparse checkout). Se non disponibile, usa il fallback remoto o la cache locale.
 
-----
-
-
 ## EN
 Repository to manage WYSIWYG sources, metadata, and PDF assets for legal documents (terms/privacy/cookie) per platform and language.
 
 ### Structure
-- `platforms/<platform>/<doctype>/<lang>/<dd-mm-yyyy>/source/`
-  Stores the source file renamed with the standard pattern.
-- `platforms/<platform>/<doctype>/<lang>/<dd-mm-yyyy>/meta.yml`
-  Metadata for audit, release, and traceability.
-- `release-assets/<platform>/<doctype>/<lang>/<dd-mm-yyyy>/`
-  Stores generated PDFs (CI or manual).
+- `platforms/<platform>/<doctype>/<lang>/<dd-mm-yyyy>/source/` stores the source file renamed with the standard pattern.
+- `platforms/<platform>/<doctype>/<lang>/<dd-mm-yyyy>/meta.yml` stores metadata for audit, release, and traceability.
+- `release-assets/<platform>/<doctype>/<lang>/<dd-mm-yyyy>/` stores generated PDFs (CI or manual).
 
 ### Naming (sources and PDFs)
-Format:
-`<platform>_<doctype>_<dd-mm-yyyy>_<lang>_v###.<ext>`
+Format: `<platform>_<doctype>_<dd-mm-yyyy>_<lang>_v###.<ext>`
 
 Examples:
 - `bricks-dev_terms_16-11-2025_it_IT_v001.docx`
@@ -72,7 +61,7 @@ Examples:
 - PAGES: manual export (Pages.app), then save to the path suggested by the script.
 
 ### Latest for webapps (JSON)
-`latest.json` provides the newest version per app/type/lang so webapps always resolve the latest PDF.
+`latest.json` provides the newest version per app/type/lang so webapps always resolve the latest PDF.  
 To rebuild it: `node scripts/generate-latest.mjs`.
 
 ### App Catalog (slugs)
