@@ -33,6 +33,9 @@ Esempi:
 Il file `meta/apps.json` viene aggiornato dallo script leggendo il manifest in `vendor/ngx-cima-landing-pages/webpages-manifest.json`
 (submodule con sparse checkout). Se non disponibile, usa il fallback remoto o la cache locale.
 
+----
+
+
 ## EN
 Repository to manage WYSIWYG sources, metadata, and PDF assets for legal documents (terms/privacy/cookie) per platform and language.
 
