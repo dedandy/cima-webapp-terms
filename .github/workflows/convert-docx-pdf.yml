@@ -1,0 +1,85 @@
+name: Convert DOCX to PDF
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  convert-docx:
+    if: "!contains(github.event.head_commit.message, '[skip pdf]')"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install LibreOffice
+        run: sudo apt-get update && sudo apt-get install -y libreoffice
+
+      - name: Convert DOCX sources
+        run: |
+          python3 - <<'PY'
+          import re
+          import subprocess
+          from pathlib import Path
+          from datetime import datetime
+
+          repo = Path(".").resolve()
+          sources = list(repo.glob("platforms/**/source/*.docx"))
+          if not sources:
+            print("No DOCX sources found.")
+            raise SystemExit(0)
+
+          pattern = re.compile(
+              r"^(?P<app>[^_]+)_(?P<type>terms|privacy|cookie)_(?P<date>\\d{2}-\\d{2}-\\d{4})_(?P<lang>[A-Za-z_]+)_(?P<ver>v\\d{3})$"
+          )
+
+          for docx in sources:
+            stem = docx.stem
+            match = pattern.match(stem)
+            if not match:
+              print(f"Skip (name mismatch): {docx}")
+              continue
+
+            app = match.group("app")
+            doctype = match.group("type")
+            date = match.group("date")
+            lang = match.group("lang")
+            version = match.group("ver")
+
+            target_dir = repo / "release-assets" / app / doctype / lang / date
+            target_dir.mkdir(parents=True, exist_ok=True)
+            out_pdf = target_dir / f"{app}_{doctype}_{date}_{lang}_{version}.pdf"
+
+            print(f"Converting {docx} -> {out_pdf}")
+            subprocess.run(
+                [
+                    "soffice",
+                    "--headless",
+                    "--convert-to",
+                    "pdf",
+                    "--outdir",
+                    str(target_dir),
+                    str(docx),
+                ],
+                check=True,
+            )
+
+            generated = target_dir / f"{docx.stem}.pdf"
+            if generated.exists() and generated != out_pdf:
+              generated.rename(out_pdf)
+          PY
+
+      - name: Commit generated PDFs
+        run: |
+          if git status --porcelain release-assets | grep -q .; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add release-assets
+            git commit -m "chore: update PDFs [skip pdf]"
+            git push
+          else
+            echo "No PDF changes to commit."
+          fi

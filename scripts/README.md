@@ -41,3 +41,6 @@ This workflow no longer uses `meta/manifest.json` or `index.md`; metadata is sto
 - Add/update the `vendor/ngx-cima-landing-pages` submodule (sparse checkout works well) so `vendor/ngx-cima-landing-pages/webpages-manifest.json` exists locally.
 - The script first parses that local manifest, extracts all `slug` values, and rewrites the `apps` array inside `meta/apps.json`—this keeps the cache current and lets the prompts work offline.
 - If the local file is missing, the script falls back to `remote_manifest_url` inside `meta/apps.json` (defaulting to the same GitHub raw URL). When both sources fail, the cached `apps` array in `meta/apps.json` is used, so commit that file after successful syncs to share the latest list with teammates.
+
+## DOCX Auto-PDF (CI)
+On push to `dev`, the GitHub Action in `.github/workflows/convert-docx-pdf.yml` converts any `platforms/**/source/*.docx` into PDFs under `release-assets/<app>/<type>/<lang>/<date>/`. The action commits the PDFs back to the branch with a `[skip pdf]` marker to avoid infinite loops. `.pages` files are excluded and must be exported manually.
