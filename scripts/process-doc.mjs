@@ -15,6 +15,8 @@ const pagesConvertibleExt = new Set(['.pages', '.doc', '.docx', '.rtf', '.rtfd']
 let pagesAvailabilityCache = null;
 const platformsRoot = path.join(repoRoot, 'platforms');
 const releaseAssetsRoot = path.join(repoRoot, 'release-assets');
+const incomingRoot = path.join(repoRoot, 'incoming');
+const latestIndexPath = path.join(repoRoot, 'latest.json');
 const defaultLanguages = ['it_IT', 'en_GB', 'en_EN', 'fr_FR'];
 const docTypes = ['terms', 'privacy', 'cookie'];
 
@@ -63,9 +65,8 @@ async function chooseFromList(prompt, options, defaultValue) {
   return options[idx].value;
 }
 
-async function gatherSourceFiles() {
+async function gatherSourceFiles(baseDir) {
   const files = [];
-  const baseDir = path.join(repoRoot, 'platforms');
   async function walk(dir) {
     const entries = await fs.readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
@@ -371,6 +372,49 @@ function buildBaseName(app, type, date, lang, version) {
   return `${app}_${type}_${date}_${lang}_${version}`;
 }
 
+function parseDateDDMMYYYY(value) {
+  const match = /^(\d{2})-(\d{2})-(\d{4})$/.exec(value);
+  if (!match) return null;
+  const [, day, month, year] = match;
+  return `${year}-${month}-${day}`;
+}
+
+function compareRelease(a, b) {
+  const aDate = parseDateDDMMYYYY(a.date);
+  const bDate = parseDateDDMMYYYY(b.date);
+  if (aDate && bDate && aDate !== bDate) {
+    return aDate.localeCompare(bDate);
+  }
+  const aVer = Number((a.version || '').replace(/[^\d]/g, '')) || 0;
+  const bVer = Number((b.version || '').replace(/[^\d]/g, '')) || 0;
+  return aVer - bVer;
+}
+
+async function readLatestIndex() {
+  try {
+    const raw = await fs.readFile(latestIndexPath, 'utf-8');
+    return JSON.parse(raw);
+  } catch (err) {
+    if (err.code === 'ENOENT') return {};
+    throw err;
+  }
+}
+
+async function writeLatestIndex(data) {
+  await fs.writeFile(latestIndexPath, `${JSON.stringify(data, null, 2)}\n`);
+}
+
+async function updateLatestIndex(entry) {
+  const latest = await readLatestIndex();
+  latest[entry.app] = latest[entry.app] || {};
+  latest[entry.app][entry.type] = latest[entry.app][entry.type] || {};
+  const current = latest[entry.app][entry.type][entry.language];
+  if (!current || compareRelease(current, entry) < 0) {
+    latest[entry.app][entry.type][entry.language] = entry;
+    await writeLatestIndex(latest);
+  }
+}
+
 async function writeMetaFile(folder, data) {
   const lines = [
     `platform: ${data.platform}`,
@@ -392,13 +436,13 @@ async function writeMetaFile(folder, data) {
   await fs.writeFile(path.join(folder, 'meta.yml'), `${lines.join('\n')}\n`);
 }
 
-async function interactiveFlow(apps) {
-  const sources = await gatherSourceFiles();
+async function interactiveFlow(apps, baseDir) {
+  const sources = await gatherSourceFiles(baseDir);
   const relativeSource = await promptForSourceFile(sources);
   const absSource = path.isAbsolute(relativeSource) ? relativeSource : path.resolve(repoRoot, relativeSource);
   const stats = await fs.stat(absSource);
   const inferredType = inferTypeFromPath(relativeSource);
-  const inferredApp = inferAppFromPath(relativeSource);
+  const inferredApp = relativeSource.includes('platforms') ? inferAppFromPath(relativeSource) : apps[0]?.id;
   const app = await chooseFromList('Select app/web-app', apps.map((app) => ({ label: `${app.label} (${app.id})`, value: app.id })), inferredApp);
   const type = await chooseFromList('Select document type', docTypes.map((value) => ({ label: value, value })), inferredType);
   const lang = await chooseFromList('Select language', defaultLanguages.map((value) => ({ label: value, value })), defaultLanguages[0]);
@@ -463,15 +507,26 @@ async function processDocument(args, apps) {
     github_release_asset: `${baseName}.pdf`
   };
   await writeMetaFile(path.join(platformsRoot, app, type, lang, date), meta);
+  await updateLatestIndex({
+    app,
+    type,
+    language: lang,
+    date,
+    version,
+    pdf: path.relative(repoRoot, targetPdfPath).replace(/\\/g, '/'),
+    source: path.relative(repoRoot, targetSourcePath).replace(/\\/g, '/')
+  });
   console.log('\nUpdated files:');
   console.log(`- Source: ${path.relative(repoRoot, targetSourcePath)}`);
   console.log(`- PDF   : ${path.relative(repoRoot, targetPdfPath)}`);
   console.log('- meta.yml updated');
+  console.log('- latest.json updated');
 }
 
 async function main() {
   const args = parseArgs();
   const apps = await loadAppCatalog();
+  const baseDir = args.incoming ? incomingRoot : platformsRoot;
 
   const required = ['app', 'type', 'version', 'date', 'lang', 'src', 'pdf'];
   const isNonInteractive = required.every((key) => args[key]);
@@ -481,7 +536,7 @@ async function main() {
     args.pdf = path.resolve(args.pdf);
     await processDocument(args, apps);
   } else {
-    await interactiveFlow(apps);
+    await interactiveFlow(apps, baseDir);
   }
 }
 
