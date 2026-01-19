@@ -41,6 +41,13 @@ It forwards every argument to `process-doc.mjs` and, on success, executes `git a
 node scripts/generate-latest.mjs
 ```
 
+## Dedupe Incoming
+When you drag multiple files into `incoming/`, you can remove duplicates before processing:
+```bash
+node scripts/dedupe-incoming.mjs
+```
+It removes duplicate filenames and duplicate file contents (SHA-256), keeping the first occurrence.
+
 ## Rebuild the Index Only
 This workflow no longer uses `meta/manifest.json` or `index.md`; metadata is stored per document in `meta.yml`.
 

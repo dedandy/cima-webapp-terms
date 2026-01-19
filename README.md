@@ -23,9 +23,10 @@ Esempi:
 ### Workflow
 1. Il team lavora sui file WYSIWYG (Word/Pages/Google Docs) in una cartella condivisa (es. SharePoint) o localmente.
 2. I file vengono copiati in `incoming/` (cartella di ingest), senza vincoli di naming.
-3. Esegui `node scripts/process-doc.mjs --incoming` per rinomina/versioning, copia nelle cartelle standard e generazione del PDF.
-4. Commit del sorgente + `meta.yml` + PDF (se presente) e aggiornamento automatico di `latest.json`.
-5. (Opzionale) Creazione Release GitHub con il PDF come asset.
+3. (Opzionale) Esegui `node scripts/dedupe-incoming.mjs` per rimuovere duplicati per nome o contenuto.
+4. Esegui `node scripts/process-doc.mjs --incoming` per rinomina/versioning, copia nelle cartelle standard e generazione del PDF.
+5. Commit del sorgente + `meta.yml` + PDF (se presente) e aggiornamento automatico di `latest.json`.
+6. (Opzionale) Creazione Release GitHub con il PDF come asset.
 
 ### Automazione PDF (ibrida)
 - DOCX: su push a `dev` la GitHub Action converte automaticamente in PDF e committa in `release-assets/`.
@@ -62,9 +63,10 @@ Examples:
 ### Workflow
 1. The team works on WYSIWYG files (Word/Pages/Google Docs) in a shared folder (e.g., SharePoint) or locally.
 2. Copy files into `incoming/` (the ingest folder) with any filename.
-3. Run `node scripts/process-doc.mjs --incoming` to rename/version, copy into standard folders, and generate the PDF.
-4. Commit the source + `meta.yml` + PDF (if present) and the updated `latest.json`.
-5. (Optional) Create a GitHub Release and attach the PDF asset.
+3. (Optional) Run `node scripts/dedupe-incoming.mjs` to remove duplicate filenames or duplicate content.
+4. Run `node scripts/process-doc.mjs --incoming` to rename/version, copy into standard folders, and generate the PDF.
+5. Commit the source + `meta.yml` + PDF (if present) and the updated `latest.json`.
+6. (Optional) Create a GitHub Release and attach the PDF asset.
 
 ### PDF Automation (hybrid)
 - DOCX: on push to `dev`, the GitHub Action converts DOCX to PDF and commits under `release-assets/`.
