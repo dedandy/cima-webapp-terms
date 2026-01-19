@@ -9,12 +9,12 @@ import { stdin as input, stdout as output } from 'process';
 import { execFile } from 'child_process';
 
 const repoRoot = path.resolve(path.join(path.dirname(fileURLToPath(import.meta.url)), '..'));
-const manifestPath = path.join(repoRoot, 'meta', 'manifest.json');
 const appsPath = path.join(repoRoot, 'meta', 'apps.json');
-const indexPath = path.join(repoRoot, 'index.md');
 const localManifestPath = path.join(repoRoot, 'vendor', 'ngx-cima-landing-pages', 'webpages-manifest.json');
 const pagesConvertibleExt = new Set(['.pages', '.doc', '.docx', '.rtf', '.rtfd']);
 let pagesAvailabilityCache = null;
+const platformsRoot = path.join(repoRoot, 'platforms');
+const releaseAssetsRoot = path.join(repoRoot, 'release-assets');
 const defaultLanguages = ['it_IT', 'en_GB', 'en_EN', 'fr_FR'];
 const docTypes = ['terms', 'privacy', 'cookie'];
 
@@ -65,7 +65,7 @@ async function chooseFromList(prompt, options, defaultValue) {
 
 async function gatherSourceFiles() {
   const files = [];
-  const baseDir = path.join(repoRoot, 'sources');
+  const baseDir = path.join(repoRoot, 'platforms');
   async function walk(dir) {
     const entries = await fs.readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
@@ -206,7 +206,7 @@ function inferTypeFromPath(relativePath) {
 
 function inferAppFromPath(relativePath) {
   const parts = relativePath.split(path.sep);
-  const idx = parts.indexOf('sources');
+  const idx = parts.indexOf('platforms');
   if (idx >= 0 && parts.length > idx + 1) {
     return parts[idx + 1];
   }
@@ -218,6 +218,12 @@ function formatDateISO(date = new Date()) {
   return date.toISOString().slice(0, 10);
 }
 
+function formatDateDDMMYYYY(date = new Date()) {
+  const iso = formatDateISO(date);
+  const [year, month, day] = iso.split('-');
+  return `${day}-${month}-${year}`;
+}
+
 function nextVersion(currentVersion) {
   if (!currentVersion) return 'v001';
   const match = /^v(\d+)$/.exec(currentVersion);
@@ -226,28 +232,23 @@ function nextVersion(currentVersion) {
   return `v${String(next).padStart(3, '0')}`;
 }
 
-async function readManifest() {
+async function suggestVersion(app, type, lang, date) {
+  const sourceDir = path.join(platformsRoot, app, type, lang, date, 'source');
   try {
-    const raw = await fs.readFile(manifestPath, 'utf-8');
-    return JSON.parse(raw);
+    const entries = await fs.readdir(sourceDir);
+    const versions = entries
+      .map((name) => {
+        const match = name.match(/_v(\d{3})\./);
+        return match ? `v${match[1]}` : null;
+      })
+      .filter(Boolean);
+    if (!versions.length) return 'v001';
+    const latest = versions.sort().pop();
+    return nextVersion(latest);
   } catch (err) {
-    if (err.code === 'ENOENT') {
-      return { generated_at: new Date().toISOString(), documents: [] };
-    }
+    if (err.code === 'ENOENT') return 'v001';
     throw err;
   }
-}
-
-async function writeManifest(manifest) {
-  manifest.generated_at = new Date().toISOString();
-  await fs.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-}
-
-function suggestVersion(manifest, app, type, lang) {
-  const documents = manifest.documents || [];
-  const match = documents.find((doc) => doc.app === app && doc.type === type && doc.language === lang);
-  if (!match) return 'v001';
-  return nextVersion(match.version);
 }
 
 async function computeChecksum(filePath) {
@@ -266,7 +267,7 @@ async function moveFile(from, to) {
 
 async function promptForSourceFile(existingSources) {
   if (!existingSources.length) {
-    const manual = await ask('No files found inside sources/. Provide path to the source file', '');
+    const manual = await ask('No files found inside platforms/. Provide path to the source file', '');
     if (!manual) throw new Error('Source file is required');
     return manual;
   }
@@ -366,23 +367,32 @@ async function obtainPdf(sourcePath, preferredOutputPath) {
   return promptForPdfPath(preferredOutputPath);
 }
 
-function buildBaseName(app, type, version, date, lang) {
-  return `${app}_${type}_${version}_${date}_${lang}`;
+function buildBaseName(app, type, date, lang, version) {
+  return `${app}_${type}_${date}_${lang}_${version}`;
 }
 
-async function updateManifest(manifest, entry) {
-  const documents = manifest.documents || [];
-  const idx = documents.findIndex((doc) => doc.app === entry.app && doc.type === entry.type && doc.language === entry.language);
-  if (idx >= 0) {
-    documents[idx] = entry;
-  } else {
-    documents.push(entry);
-  }
-  manifest.documents = documents;
-  await writeManifest(manifest);
+async function writeMetaFile(folder, data) {
+  const lines = [
+    `platform: ${data.platform}`,
+    `document_type: ${data.document_type}`,
+    `language: ${data.language}`,
+    '',
+    `version: ${data.version}`,
+    `drafted_on: ${data.drafted_on}`,
+    'effective_from:',
+    '',
+    'author:',
+    'reviewed_by:',
+    '',
+    `github_release_tag: ${data.github_release_tag}`,
+    `github_release_asset: ${data.github_release_asset}`,
+    '',
+    'notes:'
+  ];
+  await fs.writeFile(path.join(folder, 'meta.yml'), `${lines.join('\n')}\n`);
 }
 
-async function interactiveFlow(manifest, apps) {
+async function interactiveFlow(apps) {
   const sources = await gatherSourceFiles();
   const relativeSource = await promptForSourceFile(sources);
   const absSource = path.isAbsolute(relativeSource) ? relativeSource : path.resolve(repoRoot, relativeSource);
@@ -392,15 +402,15 @@ async function interactiveFlow(manifest, apps) {
   const app = await chooseFromList('Select app/web-app', apps.map((app) => ({ label: `${app.label} (${app.id})`, value: app.id })), inferredApp);
   const type = await chooseFromList('Select document type', docTypes.map((value) => ({ label: value, value })), inferredType);
   const lang = await chooseFromList('Select language', defaultLanguages.map((value) => ({ label: value, value })), defaultLanguages[0]);
-  const dateDefault = formatDateISO(stats.mtime);
-  const date = await ask('Release date (YYYY-MM-DD)', dateDefault);
-  const version = await ask('Version', suggestVersion(manifest, app, type, lang));
-  const baseName = buildBaseName(app, type, version, date, lang);
-  const targetDocsDir = path.join(repoRoot, 'docs', app, type);
+  const dateDefault = formatDateDDMMYYYY(stats.mtime);
+  const date = await ask('Document date (DD-MM-YYYY)', dateDefault);
+  const version = await ask('Version (v001, v002, ...)', await suggestVersion(app, type, lang, date));
+  const baseName = buildBaseName(app, type, date, lang, version);
+  const targetDocsDir = path.join(releaseAssetsRoot, app, type, lang, date);
   const preferredPdfPath = path.join(targetDocsDir, `${baseName}.pdf`);
   const pdfPath = await obtainPdf(absSource, preferredPdfPath);
   const args = { app, type, version, date, lang, src: absSource, pdf: path.resolve(pdfPath), baseName };
-  await processDocument(args, manifest, apps);
+  await processDocument(args, apps);
 }
 
 async function copyPreserving(from, to) {
@@ -428,48 +438,12 @@ async function renameOriginalSource(originalPath, baseName) {
   console.log(`Original source renamed to ${path.relative(repoRoot, target)}`);
 }
 
-async function writeIndexFromManifest(manifest, apps) {
-  const documents = manifest.documents || [];
-  const appMap = new Map(apps.map((app) => [app.id, app.label || app.id]));
-  const grouped = new Map();
-  documents.forEach((doc) => {
-    if (!grouped.has(doc.app)) grouped.set(doc.app, []);
-    grouped.get(doc.app).push(doc);
-  });
-  const header = `# Legal Document Index\n\nThis file is auto-generated. File naming pattern: \`app_type_v###_YYYY-MM-DD_lang.ext\` with language trailing. PDFs live in \`docs/<app>/<type>/\`, sources in \`sources/<app>/<type>/\`. Run \`node scripts/process-doc.mjs --reindex true\` to rebuild.`;
-  const sections = [];
-  const appIds = Array.from(grouped.keys()).sort();
-  appIds.forEach((appId) => {
-    const label = appMap.get(appId) || appId;
-    const docs = grouped.get(appId).sort((a, b) => {
-      if (a.type !== b.type) return a.type.localeCompare(b.type);
-      if (a.language !== b.language) return a.language.localeCompare(b.language);
-      return b.version.localeCompare(a.version);
-    });
-    const rows = docs
-      .map(
-        (doc) =>
-          `| ${doc.type} | ${doc.version} | ${doc.released_on} | ${doc.language} | [PDF](${doc.pdf_path}) | [Source](${doc.source_path}) |`
-      )
-      .join('\n');
-    const table = rows || '| _ | _ | _ | _ | _ | _ |';
-    sections.push(
-      `## ${label} (${appId})\n\n| Type | Version | Date | Language | PDF Link | Source Link |\n|------|---------|------|----------|----------|-------------|\n${table}`
-    );
-  });
-  if (!sections.length) {
-    sections.push('_No documents published yet._');
-  }
-  const content = `${header}\n\n${sections.join('\n\n')}\n`;
-  await fs.writeFile(indexPath, content);
-}
-
-async function processDocument(args, manifest, apps) {
+async function processDocument(args, apps) {
   const { app, type, version, date, lang } = args;
-  const baseName = args.baseName || buildBaseName(app, type, version, date, lang);
+  const baseName = args.baseName || buildBaseName(app, type, date, lang, version);
   const sourceExt = path.extname(args.src) || '.docx';
-  const targetSourceDir = path.join(repoRoot, 'sources', app, type);
-  const targetDocsDir = path.join(repoRoot, 'docs', app, type);
+  const targetSourceDir = path.join(platformsRoot, app, type, lang, date, 'source');
+  const targetDocsDir = path.join(releaseAssetsRoot, app, type, lang, date);
   const targetSourcePath = path.join(targetSourceDir, `${baseName}${sourceExt}`);
   const targetPdfPath = path.join(targetDocsDir, `${baseName}.pdf`);
 
@@ -479,37 +453,25 @@ async function processDocument(args, manifest, apps) {
   await copyPreserving(args.pdf, targetPdfPath);
   await renameOriginalSource(args.src, baseName);
 
-  const checksum = await computeChecksum(targetPdfPath);
-  const entry = {
-    app,
-    type,
+  const meta = {
+    platform: app,
+    document_type: type,
     language: lang,
     version,
-    released_on: date,
-    filename: path.basename(targetPdfPath),
-    pdf_path: path.relative(repoRoot, targetPdfPath).replace(/\\/g, '/'),
-    source_path: path.relative(repoRoot, targetSourcePath).replace(/\\/g, '/'),
-    checksum
+    drafted_on: date,
+    github_release_tag: baseName,
+    github_release_asset: `${baseName}.pdf`
   };
-  await updateManifest(manifest, entry);
-  await writeIndexFromManifest(manifest, apps);
+  await writeMetaFile(path.join(platformsRoot, app, type, lang, date), meta);
   console.log('\nUpdated files:');
-  console.log(`- Source: ${entry.source_path}`);
-  console.log(`- PDF   : ${entry.pdf_path}`);
-  console.log('- manifest.json refreshed');
-  console.log('- index.md regenerated');
+  console.log(`- Source: ${path.relative(repoRoot, targetSourcePath)}`);
+  console.log(`- PDF   : ${path.relative(repoRoot, targetPdfPath)}`);
+  console.log('- meta.yml updated');
 }
 
 async function main() {
   const args = parseArgs();
-  const manifest = await readManifest();
   const apps = await loadAppCatalog();
-
-  if (args.reindex) {
-    await writeIndexFromManifest(manifest, apps);
-    console.log('index.md regenerated from manifest.');
-    return;
-  }
 
   const required = ['app', 'type', 'version', 'date', 'lang', 'src', 'pdf'];
   const isNonInteractive = required.every((key) => args[key]);
@@ -517,9 +479,9 @@ async function main() {
   if (isNonInteractive) {
     args.src = path.resolve(args.src);
     args.pdf = path.resolve(args.pdf);
-    await processDocument(args, manifest, apps);
+    await processDocument(args, apps);
   } else {
-    await interactiveFlow(manifest, apps);
+    await interactiveFlow(apps);
   }
 }
 

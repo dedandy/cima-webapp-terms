@@ -7,9 +7,8 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 node "$SCRIPT_DIR/process-doc.mjs" "$@"
 
 if git -C "$REPO_ROOT" add \
-  docs \
-  sources \
-  meta/manifest.json \
+  platforms \
+  release-assets \
   meta/apps.json \
   index.md; then
   echo "Staged updated files via git add."

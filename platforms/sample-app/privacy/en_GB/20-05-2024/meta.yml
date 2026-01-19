@@ -1,0 +1,15 @@
+platform: sample-app
+document_type: privacy
+language: en_GB
+
+version: v001
+drafted_on: 20-05-2024
+effective_from:
+
+author:
+reviewed_by:
+
+github_release_tag: sample-app_privacy_20-05-2024_en_GB_v001
+github_release_asset: sample-app_privacy_20-05-2024_en_GB_v001.pdf
+
+notes:
