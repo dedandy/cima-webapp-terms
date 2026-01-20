@@ -1,0 +1,15 @@
+{
+  "mydewetra-italy": {
+    "terms": {
+      "it_IT": {
+        "app": "mydewetra-italy",
+        "type": "terms",
+        "language": "it_IT",
+        "date": "19-01-2026",
+        "version": "v008",
+        "pdf": "release-assets/mydewetra-italy/terms/it_IT/19-01-2026/mydewetra-italy_terms_19-01-2026_it_IT_v008.pdf",
+        "source": "platforms/mydewetra-italy/terms/it_IT/19-01-2026/source/mydewetra-italy_terms_19-01-2026_it_IT_v008.docx"
+      }
+    }
+  }
+}

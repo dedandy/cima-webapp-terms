@@ -36,6 +36,10 @@ Esempi:
 `latest.json` contiene l'ultima versione per app/type/lang. Le webapp possono leggerlo per risolvere sempre il PDF piu' recente.  
 Per rigenerarlo: `node scripts/generate-latest.mjs`.
 
+### GitHub Pages (indice PDF + latest.json)
+La workflow in `.github/workflows/jekyll-gh-pages.yml` genera un indice HTML e pubblica `latest.json` su GitHub Pages.  
+L'indice punta ai PDF via Release asset, quindi i link restano stabili e immutabili.
+
 ### Catalogo app (slugs)
 Il file `meta/apps.json` viene aggiornato dallo script leggendo il manifest in `vendor/ngx-cima-landing-pages/webpages-manifest.json`
 (submodule con sparse checkout). Se non disponibile, usa il fallback remoto o la cache locale.
@@ -75,6 +79,10 @@ Examples:
 ### Latest for webapps (JSON)
 `latest.json` provides the newest version per app/type/lang so webapps always resolve the latest PDF.  
 To rebuild it: `node scripts/generate-latest.mjs`.
+
+### GitHub Pages (PDF index + latest.json)
+The workflow in `.github/workflows/jekyll-gh-pages.yml` generates an HTML index and publishes `latest.json` to GitHub Pages.  
+The index links to PDFs via Release assets, so URLs stay stable and immutable.
 
 ### App Catalog (slugs)
 `meta/apps.json` is refreshed by the script using `vendor/ngx-cima-landing-pages/webpages-manifest.json`

@@ -5,6 +5,7 @@ import path from 'path';
 const repoRoot = path.resolve(path.join(new URL(import.meta.url).pathname, '..', '..'));
 const platformsRoot = path.join(repoRoot, 'platforms');
 const latestIndexPath = path.join(repoRoot, 'latest.json');
+const releaseBaseUrl = process.env.RELEASE_BASE_URL;
 
 function parseDateDDMMYYYY(value) {
   const match = /^(\d{2})-(\d{2})-(\d{4})$/.exec(value);
@@ -22,6 +23,17 @@ function compareRelease(a, b) {
   const aVer = Number((a.version || '').replace(/[^\d]/g, '')) || 0;
   const bVer = Number((b.version || '').replace(/[^\d]/g, '')) || 0;
   return aVer - bVer;
+}
+
+function buildReleaseUrl(tag, asset) {
+  if (releaseBaseUrl) {
+    return `${releaseBaseUrl.replace(/\/$/, '')}/${tag}/${asset}`;
+  }
+  const repo = process.env.GITHUB_REPOSITORY;
+  if (repo) {
+    return `https://github.com/${repo}/releases/download/${tag}/${asset}`;
+  }
+  return null;
 }
 
 async function walk(dir) {
@@ -83,13 +95,15 @@ async function main() {
     }
 
     const pdfPath = path.join('release-assets', app, type, lang, date, `${meta.github_release_tag}.pdf`);
+    const pdfRelease = buildReleaseUrl(meta.github_release_tag, `${meta.github_release_tag}.pdf`);
     const entry = {
       app,
       type,
       language: lang,
       date,
       version: meta.version,
-      pdf: pdfPath.replace(/\\/g, '/'),
+      pdf_path: pdfPath.replace(/\\/g, '/'),
+      pdf_release: pdfRelease,
       source: sourceFile ? path.join(folder, 'source', sourceFile).replace(repoRoot, '').replace(/\\/g, '/').replace(/^\/+/, '') : undefined
     };
 

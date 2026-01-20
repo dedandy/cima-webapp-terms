@@ -58,3 +58,6 @@ This workflow no longer uses `meta/manifest.json` or `index.md`; metadata is sto
 
 ## DOCX Auto-PDF (CI)
 On push to `dev`, the GitHub Action in `.github/workflows/convert-docx-pdf.yml` converts any `platforms/**/source/*.docx` into PDFs under `release-assets/<app>/<type>/<lang>/<date>/`. The action commits the PDFs back to the branch with a `[skip pdf]` marker to avoid infinite loops. `.pages` files are excluded and must be exported manually.
+
+## GitHub Pages Index
+The workflow `.github/workflows/jekyll-gh-pages.yml` generates `latest.json` and a static HTML index under `_site/`, then publishes them to GitHub Pages. The index links to each PDF using the release URL when available.

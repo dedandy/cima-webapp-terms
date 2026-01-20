@@ -17,6 +17,7 @@ const platformsRoot = path.join(repoRoot, 'platforms');
 const releaseAssetsRoot = path.join(repoRoot, 'release-assets');
 const incomingRoot = path.join(repoRoot, 'incoming');
 const latestIndexPath = path.join(repoRoot, 'latest.json');
+const releaseBaseUrl = process.env.RELEASE_BASE_URL;
 const defaultLanguages = ['it_IT', 'en_GB', 'en_EN', 'fr_FR'];
 const docTypes = ['terms', 'privacy', 'cookie'];
 
@@ -372,6 +373,17 @@ function buildBaseName(app, type, date, lang, version) {
   return `${app}_${type}_${date}_${lang}_${version}`;
 }
 
+function buildReleaseUrl(tag, asset) {
+  if (releaseBaseUrl) {
+    return `${releaseBaseUrl.replace(/\/$/, '')}/${tag}/${asset}`;
+  }
+  const repo = process.env.GITHUB_REPOSITORY;
+  if (repo) {
+    return `https://github.com/${repo}/releases/download/${tag}/${asset}`;
+  }
+  return null;
+}
+
 function parseDateDDMMYYYY(value) {
   const match = /^(\d{2})-(\d{2})-(\d{4})$/.exec(value);
   if (!match) return null;
@@ -507,13 +519,15 @@ async function processDocument(args, apps) {
     github_release_asset: `${baseName}.pdf`
   };
   await writeMetaFile(path.join(platformsRoot, app, type, lang, date), meta);
+  const pdfRelease = buildReleaseUrl(baseName, `${baseName}.pdf`);
   await updateLatestIndex({
     app,
     type,
     language: lang,
     date,
     version,
-    pdf: path.relative(repoRoot, targetPdfPath).replace(/\\/g, '/'),
+    pdf_path: path.relative(repoRoot, targetPdfPath).replace(/\\/g, '/'),
+    pdf_release: pdfRelease,
     source: path.relative(repoRoot, targetSourcePath).replace(/\\/g, '/')
   });
   console.log('\nUpdated files:');
