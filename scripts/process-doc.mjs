@@ -10,7 +10,6 @@ import { execFile } from 'child_process';
 
 const repoRoot = path.resolve(path.join(path.dirname(fileURLToPath(import.meta.url)), '..'));
 const appsPath = path.join(repoRoot, 'meta', 'apps.json');
-const localManifestPath = path.join(repoRoot, 'vendor', 'ngx-cima-landing-pages', 'webpages-manifest.json');
 const pagesConvertibleExt = new Set(['.pages', '.doc', '.docx', '.rtf', '.rtfd']);
 let pagesAvailabilityCache = null;
 const platformsRoot = path.join(repoRoot, 'platforms');
@@ -156,19 +155,6 @@ async function loadAppCatalog() {
 
   let fallback = config.apps && config.apps.length ? config.apps : [{ id: 'sample-app', label: 'Sample App' }];
   let resolvedApps = [];
-
-  if (await fileExists(localManifestPath)) {
-    try {
-      const raw = await fs.readFile(localManifestPath, 'utf-8');
-      const data = JSON.parse(raw);
-      resolvedApps = extractRemoteApps(data);
-      if (!resolvedApps.length) {
-        console.warn('Local webpages-manifest.json found but no slugs extracted.');
-      }
-    } catch (err) {
-      console.warn(`Failed to parse local webpages-manifest.json: ${err.message}`);
-    }
-  }
 
   if (!resolvedApps.length && config.remote_manifest_url) {
     try {
