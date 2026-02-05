@@ -1,14 +1,45 @@
 {
-  "mydewetra-italy": {
-    "terms": {
+  "platforms": {
+    "bricks-dev": {
       "it_IT": {
-        "app": "mydewetra-italy",
-        "type": "terms",
+        "app": "platforms",
+        "type": "bricks-dev",
         "language": "it_IT",
-        "date": "19-01-2026",
-        "version": "v008",
-        "pdf": "release-assets/mydewetra-italy/terms/it_IT/19-01-2026/mydewetra-italy_terms_19-01-2026_it_IT_v008.pdf",
-        "source": "platforms/mydewetra-italy/terms/it_IT/19-01-2026/source/mydewetra-italy_terms_19-01-2026_it_IT_v008.docx"
+        "date": "05-02-2026",
+        "version": "v001",
+        "pdf_path": "release-assets/platforms/bricks-dev/it_IT/05-02-2026/bricks-dev_privacy_05-02-2026_it_IT_v001.pdf",
+        "pdf_release": null
+      }
+    },
+    "mydewetra-italy": {
+      "it_IT": {
+        "app": "platforms",
+        "type": "mydewetra-italy",
+        "language": "it_IT",
+        "date": "05-02-2026",
+        "version": "v001",
+        "pdf_path": "release-assets/platforms/mydewetra-italy/it_IT/05-02-2026/mydewetra-italy_terms_05-02-2026_it_IT_v001.pdf",
+        "pdf_release": null
+      }
+    },
+    "sample-app": {
+      "it_IT": {
+        "app": "platforms",
+        "type": "sample-app",
+        "language": "it_IT",
+        "date": "20-05-2024",
+        "version": "v001",
+        "pdf_path": "release-assets/platforms/sample-app/it_IT/20-05-2024/sample-app_cookie_20-05-2024_it_IT_v001.pdf",
+        "pdf_release": null
+      },
+      "en_GB": {
+        "app": "platforms",
+        "type": "sample-app",
+        "language": "en_GB",
+        "date": "20-05-2024",
+        "version": "v001",
+        "pdf_path": "release-assets/platforms/sample-app/en_GB/20-05-2024/sample-app_privacy_20-05-2024_en_GB_v001.pdf",
+        "pdf_release": null
       }
     }
   }

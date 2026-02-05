@@ -10,7 +10,7 @@ import { execFile } from 'child_process';
 
 const repoRoot = path.resolve(path.join(path.dirname(fileURLToPath(import.meta.url)), '..'));
 const appsPath = path.join(repoRoot, 'meta', 'apps.json');
-const pagesConvertibleExt = new Set(['.pages', '.doc', '.docx', '.rtf', '.rtfd']);
+const pagesConvertibleExt = new Set(['.doc', '.docx', '.rtf', '.rtfd']);
 let pagesAvailabilityCache = null;
 const platformsRoot = path.join(repoRoot, 'platforms');
 const releaseAssetsRoot = path.join(repoRoot, 'release-assets');
@@ -261,9 +261,13 @@ async function promptForSourceFile(existingSources) {
   }
   const options = [
     ...existingSources.map((file) => ({ label: file, value: file })),
+    { label: '[Quit] Exit processing', value: '__quit__' },
     { label: '[Other] Enter custom path', value: null }
   ];
   const selection = await chooseFromList('Select the source file to process', options, options[0].value);
+  if (selection === '__quit__') {
+    return null;
+  }
   if (selection) return selection;
   const manual = await ask('Manual path to source file', '');
   if (!manual) throw new Error('Source file is required');
@@ -438,13 +442,23 @@ async function interactiveFlow(apps, baseDir) {
   let sources = await gatherSourceFiles(baseDir);
   if (!sources.length) {
     const relativeSource = await promptForSourceFile(sources);
+    if (!relativeSource) return;
     sources = [relativeSource];
   }
 
   while (sources.length) {
     const relativeSource = await promptForSourceFile(sources);
+    if (!relativeSource) return;
     const absSource = path.isAbsolute(relativeSource) ? relativeSource : path.resolve(repoRoot, relativeSource);
     const stats = await fs.stat(absSource);
+    if (path.extname(absSource).toLowerCase() === '.pages') {
+      console.log('Skipping .pages files. Export to PDF first, then re-run.');
+      sources = sources.filter((entry) => entry !== relativeSource);
+      if (!sources.length) {
+        console.log('No more files to process.');
+      }
+      continue;
+    }
     const inferredType = inferTypeFromPath(relativeSource);
     const inferredApp = relativeSource.includes('platforms') ? inferAppFromPath(relativeSource) : apps[0]?.id;
     const app = await chooseFromList(

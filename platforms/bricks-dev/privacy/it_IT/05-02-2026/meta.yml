@@ -1,0 +1,15 @@
+platform: bricks-dev
+document_type: privacy
+language: it_IT
+
+version: v001
+drafted_on: 05-02-2026
+effective_from:
+
+author:
+reviewed_by:
+
+github_release_tag: bricks-dev_privacy_05-02-2026_it_IT_v001
+github_release_asset: bricks-dev_privacy_05-02-2026_it_IT_v001.pdf
+
+notes:
