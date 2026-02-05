@@ -449,24 +449,49 @@ async function writeMetaFile(folder, data) {
 }
 
 async function interactiveFlow(apps, baseDir) {
-  const sources = await gatherSourceFiles(baseDir);
-  const relativeSource = await promptForSourceFile(sources);
-  const absSource = path.isAbsolute(relativeSource) ? relativeSource : path.resolve(repoRoot, relativeSource);
-  const stats = await fs.stat(absSource);
-  const inferredType = inferTypeFromPath(relativeSource);
-  const inferredApp = relativeSource.includes('platforms') ? inferAppFromPath(relativeSource) : apps[0]?.id;
-  const app = await chooseFromList('Select app/web-app', apps.map((app) => ({ label: `${app.label} (${app.id})`, value: app.id })), inferredApp);
-  const type = await chooseFromList('Select document type', docTypes.map((value) => ({ label: value, value })), inferredType);
-  const lang = await chooseFromList('Select language', defaultLanguages.map((value) => ({ label: value, value })), defaultLanguages[0]);
-  const dateDefault = formatDateDDMMYYYY(stats.mtime);
-  const date = await ask('Document date (DD-MM-YYYY)', dateDefault);
-  const version = await ask('Version (v001, v002, ...)', await suggestVersion(app, type, lang, date));
-  const baseName = buildBaseName(app, type, date, lang, version);
-  const targetDocsDir = path.join(releaseAssetsRoot, app, type, lang, date);
-  const preferredPdfPath = path.join(targetDocsDir, `${baseName}.pdf`);
-  const pdfPath = await obtainPdf(absSource, preferredPdfPath);
-  const args = { app, type, version, date, lang, src: absSource, pdf: path.resolve(pdfPath), baseName };
-  await processDocument(args, apps);
+  let sources = await gatherSourceFiles(baseDir);
+  if (!sources.length) {
+    const relativeSource = await promptForSourceFile(sources);
+    sources = [relativeSource];
+  }
+
+  while (sources.length) {
+    const relativeSource = await promptForSourceFile(sources);
+    const absSource = path.isAbsolute(relativeSource) ? relativeSource : path.resolve(repoRoot, relativeSource);
+    const stats = await fs.stat(absSource);
+    const inferredType = inferTypeFromPath(relativeSource);
+    const inferredApp = relativeSource.includes('platforms') ? inferAppFromPath(relativeSource) : apps[0]?.id;
+    const app = await chooseFromList(
+      'Select app/web-app',
+      apps.map((app) => ({ label: `${app.label} (${app.id})`, value: app.id })),
+      inferredApp
+    );
+    const type = await chooseFromList(
+      'Select document type',
+      docTypes.map((value) => ({ label: value, value })),
+      inferredType
+    );
+    const lang = await chooseFromList(
+      'Select language',
+      defaultLanguages.map((value) => ({ label: value, value })),
+      defaultLanguages[0]
+    );
+    const dateDefault = formatDateDDMMYYYY(stats.mtime);
+    const date = await ask('Document date (DD-MM-YYYY)', dateDefault);
+    const version = await ask('Version (v001, v002, ...)', await suggestVersion(app, type, lang, date));
+    const baseName = buildBaseName(app, type, date, lang, version);
+    const targetDocsDir = path.join(releaseAssetsRoot, app, type, lang, date);
+    const preferredPdfPath = path.join(targetDocsDir, `${baseName}.pdf`);
+    const isPdfSource = path.extname(absSource).toLowerCase() === '.pdf';
+    const pdfPath = isPdfSource ? absSource : await obtainPdf(absSource, preferredPdfPath);
+    const args = { app, type, version, date, lang, src: absSource, pdf: path.resolve(pdfPath), baseName };
+    await processDocument(args, apps);
+
+    sources = sources.filter((entry) => entry !== relativeSource);
+    if (!sources.length) {
+      console.log('No more files to process.');
+    }
+  }
 }
 
 async function copyPreserving(from, to) {

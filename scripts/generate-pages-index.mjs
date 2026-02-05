@@ -25,38 +25,48 @@ async function readLatest() {
   }
 }
 
-function buildRows(latest) {
+async function buildRows(latest) {
   const rows = [];
-  Object.keys(latest)
-    .sort()
-    .forEach((app) => {
-      const types = latest[app] || {};
-      Object.keys(types)
-        .sort()
-        .forEach((type) => {
-          const langs = types[type] || {};
-          Object.keys(langs)
-            .sort()
-            .forEach((lang) => {
-              const entry = langs[lang];
-              const pdfUrl = entry.pdf_release || entry.pdf_path || '';
-              rows.push({
-                app,
-                type,
-                lang,
-                version: entry.version || '',
-                date: entry.date || '',
-                pdf: pdfUrl
-              });
-            });
+  const seenPdfPaths = new Map();
+  for (const app of Object.keys(latest).sort()) {
+    const types = latest[app] || {};
+    for (const type of Object.keys(types).sort()) {
+      const langs = types[type] || {};
+      for (const lang of Object.keys(langs).sort()) {
+        const entry = langs[lang];
+        const pdfUrl = entry.pdf_release || entry.pdf_path || '';
+        let status = 'missing';
+        if (entry.pdf_release) {
+          status = 'release';
+        } else if (entry.pdf_path) {
+          if (!seenPdfPaths.has(entry.pdf_path)) {
+            const resolved = path.resolve(repoRoot, entry.pdf_path);
+            try {
+              await fs.access(resolved);
+              seenPdfPaths.set(entry.pdf_path, true);
+            } catch {
+              seenPdfPaths.set(entry.pdf_path, false);
+            }
+          }
+          status = seenPdfPaths.get(entry.pdf_path) ? 'local' : 'missing';
+        }
+        rows.push({
+          platform: app,
+          lang,
+          version: entry.version || '',
+          date: entry.date || '',
+          pdf: pdfUrl,
+          status
         });
-    });
+      }
+    }
+  }
   return rows;
 }
 
 async function main() {
   const latest = await readLatest();
-  const rows = buildRows(latest);
+  const rows = await buildRows(latest);
 
   await fs.mkdir(siteDir, { recursive: true });
   await fs.copyFile(latestPath, path.join(siteDir, 'latest.json')).catch(() => {});
@@ -81,16 +91,16 @@ async function main() {
   </head>
   <body>
     <h1>Latest Legal Documents</h1>
-    <p>Auto-generated index of the latest PDFs per app/type/language.</p>
+    <p>Auto-generated index of the latest PDFs per platform/language.</p>
     <table>
       <thead>
         <tr>
-          <th>App</th>
-          <th>Type</th>
+          <th>Platform</th>
           <th>Lang</th>
           <th>Date</th>
           <th>Version</th>
           <th>PDF</th>
+          <th>Status</th>
         </tr>
       </thead>
       <tbody>
@@ -100,12 +110,12 @@ async function main() {
                 .map(
                   (row) => `
         <tr>
-          <td>${escapeHtml(row.app)}</td>
-          <td>${escapeHtml(row.type)}</td>
+          <td>${escapeHtml(row.platform)}</td>
           <td>${escapeHtml(row.lang)}</td>
           <td>${escapeHtml(row.date)}</td>
           <td>${escapeHtml(row.version)}</td>
           <td>${row.pdf ? `<a href="${escapeHtml(row.pdf)}">Download</a>` : ''}</td>
+          <td>${escapeHtml(row.status)}</td>
         </tr>`
                 )
                 .join('')

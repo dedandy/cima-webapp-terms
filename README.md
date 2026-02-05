@@ -28,6 +28,18 @@ Esempi:
 5. Commit del sorgente + `meta.yml` + PDF (se presente) e aggiornamento automatico di `latest.json`.
 6. (Opzionale) Creazione Release GitHub con il PDF come asset.
 
+### Workflow Operativo (Ingest) - Punto per Punto
+1. Metti tutti i file grezzi in `incoming/` (DOCX, PAGES, PDF, ecc.).
+2. (Opzionale) Deduplica: `node scripts/dedupe-incoming.mjs`.
+3. Avvia l’ingest: `node scripts/process-doc.mjs --incoming`.
+4. Seleziona il file da processare dalla lista (uno alla volta).
+5. Scegli app, tipo documento, lingua.
+6. Conferma data e versione suggerite.
+7. Se il file è DOCX/PAGES/RTF, lo script prova a generare il PDF automaticamente.
+8. Se il file è PDF, lo script lo rinomina e lo sposta senza conversione.
+9. Al termine, il file processato viene rimosso dalla lista e puoi proseguire col successivo.
+10. Verifica gli output in `platforms/` e `release-assets/`, poi committa (incluso `latest.json`).
+
 ### Automazione PDF (ibrida)
 - DOCX: su push a `dev` la GitHub Action converte automaticamente in PDF e committa in `release-assets/`.
 - PAGES: conversione manuale (Pages.app), poi salvataggio nel percorso suggerito dallo script.
