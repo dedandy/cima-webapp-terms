@@ -53,8 +53,8 @@ La workflow in `.github/workflows/jekyll-gh-pages.yml` genera un indice HTML e p
 L'indice punta ai PDF via Release asset, quindi i link restano stabili e immutabili.
 
 ### Catalogo app (slugs)
-Il file `meta/apps.json` viene aggiornato dallo script leggendo il manifest in `vendor/ngx-cima-landing-pages/webpages-manifest.json`
-(submodule con sparse checkout). Se non disponibile, usa il fallback remoto o la cache locale.
+Il file `meta/apps.json` viene aggiornato dallo script leggendo il manifest remoto (`remote_manifest_url`).
+Se il manifest remoto non è disponibile, usa la cache locale presente in `meta/apps.json`.
 
 ## EN
 Repository to manage WYSIWYG sources, metadata, and PDF assets for legal documents (terms/privacy/cookie) per platform and language.
@@ -97,5 +97,5 @@ The workflow in `.github/workflows/jekyll-gh-pages.yml` generates an HTML index 
 The index links to PDFs via Release assets, so URLs stay stable and immutable.
 
 ### App Catalog (slugs)
-`meta/apps.json` is refreshed by the script using `vendor/ngx-cima-landing-pages/webpages-manifest.json`
-(submodule with sparse checkout). If unavailable, it falls back to the remote URL or cached list.
+`meta/apps.json` is refreshed by the script using the remote manifest URL in `meta/apps.json`.
+If unavailable, it falls back to the cached list.

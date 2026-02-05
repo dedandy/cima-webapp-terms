@@ -10,15 +10,14 @@ import { execFile } from 'child_process';
 
 const repoRoot = path.resolve(path.join(path.dirname(fileURLToPath(import.meta.url)), '..'));
 const appsPath = path.join(repoRoot, 'meta', 'apps.json');
-const localManifestPath = path.join(repoRoot, 'vendor', 'ngx-cima-landing-pages', 'webpages-manifest.json');
-const pagesConvertibleExt = new Set(['.pages', '.doc', '.docx', '.rtf', '.rtfd']);
+const pagesConvertibleExt = new Set(['.doc', '.docx', '.rtf', '.rtfd']);
 let pagesAvailabilityCache = null;
 const platformsRoot = path.join(repoRoot, 'platforms');
 const releaseAssetsRoot = path.join(repoRoot, 'release-assets');
 const incomingRoot = path.join(repoRoot, 'incoming');
 const latestIndexPath = path.join(repoRoot, 'latest.json');
 const releaseBaseUrl = process.env.RELEASE_BASE_URL;
-const defaultLanguages = ['it_IT', 'en_GB', 'en_EN', 'fr_FR'];
+const defaultLanguages = ['it_IT', 'en_GB', 'en_EN', 'fr_FR', 'es_ES', 'pt_PT'];
 const docTypes = ['terms', 'privacy', 'cookie'];
 
 const rl = createInterface({ input, output });
@@ -157,19 +156,6 @@ async function loadAppCatalog() {
   let fallback = config.apps && config.apps.length ? config.apps : [{ id: 'sample-app', label: 'Sample App' }];
   let resolvedApps = [];
 
-  if (await fileExists(localManifestPath)) {
-    try {
-      const raw = await fs.readFile(localManifestPath, 'utf-8');
-      const data = JSON.parse(raw);
-      resolvedApps = extractRemoteApps(data);
-      if (!resolvedApps.length) {
-        console.warn('Local webpages-manifest.json found but no slugs extracted.');
-      }
-    } catch (err) {
-      console.warn(`Failed to parse local webpages-manifest.json: ${err.message}`);
-    }
-  }
-
   if (!resolvedApps.length && config.remote_manifest_url) {
     try {
       const data = await fetchJson(config.remote_manifest_url);
@@ -275,9 +261,13 @@ async function promptForSourceFile(existingSources) {
   }
   const options = [
     ...existingSources.map((file) => ({ label: file, value: file })),
+    { label: '[Quit] Exit processing', value: '__quit__' },
     { label: '[Other] Enter custom path', value: null }
   ];
   const selection = await chooseFromList('Select the source file to process', options, options[0].value);
+  if (selection === '__quit__') {
+    return null;
+  }
   if (selection) return selection;
   const manual = await ask('Manual path to source file', '');
   if (!manual) throw new Error('Source file is required');
@@ -452,13 +442,23 @@ async function interactiveFlow(apps, baseDir) {
   let sources = await gatherSourceFiles(baseDir);
   if (!sources.length) {
     const relativeSource = await promptForSourceFile(sources);
+    if (!relativeSource) return;
     sources = [relativeSource];
   }
 
   while (sources.length) {
     const relativeSource = await promptForSourceFile(sources);
+    if (!relativeSource) return;
     const absSource = path.isAbsolute(relativeSource) ? relativeSource : path.resolve(repoRoot, relativeSource);
     const stats = await fs.stat(absSource);
+    if (path.extname(absSource).toLowerCase() === '.pages') {
+      console.log('Skipping .pages files. Export to PDF first, then re-run.');
+      sources = sources.filter((entry) => entry !== relativeSource);
+      if (!sources.length) {
+        console.log('No more files to process.');
+      }
+      continue;
+    }
     const inferredType = inferTypeFromPath(relativeSource);
     const inferredApp = relativeSource.includes('platforms') ? inferAppFromPath(relativeSource) : apps[0]?.id;
     const app = await chooseFromList(
