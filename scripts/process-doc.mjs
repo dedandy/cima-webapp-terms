@@ -18,7 +18,7 @@ const releaseAssetsRoot = path.join(repoRoot, 'release-assets');
 const incomingRoot = path.join(repoRoot, 'incoming');
 const latestIndexPath = path.join(repoRoot, 'latest.json');
 const releaseBaseUrl = process.env.RELEASE_BASE_URL;
-const defaultLanguages = ['it_IT', 'en_GB', 'en_EN', 'fr_FR'];
+const defaultLanguages = ['it_IT', 'en_GB', 'en_EN', 'fr_FR', 'es_ES', 'pt_PT'];
 const docTypes = ['terms', 'privacy', 'cookie'];
 
 const rl = createInterface({ input, output });
