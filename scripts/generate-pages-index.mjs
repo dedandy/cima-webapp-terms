@@ -25,16 +25,21 @@ async function readLatest() {
   }
 }
 
-async function buildRows(latest) {
+async function buildRows(latest, options = {}) {
   const rows = [];
   const seenPdfPaths = new Map();
+  const { repoSlug, refName } = options;
   for (const app of Object.keys(latest).sort()) {
     const types = latest[app] || {};
     for (const type of Object.keys(types).sort()) {
       const langs = types[type] || {};
       for (const lang of Object.keys(langs).sort()) {
         const entry = langs[lang];
-        const pdfUrl = entry.pdf_release || entry.pdf_path || '';
+        let pdfUrl = entry.pdf_release || entry.pdf_path || '';
+        if (!entry.pdf_release && entry.pdf_path && repoSlug && refName) {
+          const normalizedPath = entry.pdf_path.replace(/\\/g, '/').replace(/^\/+/, '');
+          pdfUrl = `https://raw.githubusercontent.com/${repoSlug}/${refName}/${normalizedPath}`;
+        }
         let status = 'missing';
         if (entry.pdf_release) {
           status = 'release';
@@ -50,8 +55,19 @@ async function buildRows(latest) {
           }
           status = seenPdfPaths.get(entry.pdf_path) ? 'local' : 'missing';
         }
+        let platform = app;
+        if (platform === 'platforms') {
+          const hint = entry.source || entry.pdf_path || '';
+          const parts = hint.replace(/\\/g, '/').split('/');
+          const idx = parts.indexOf('platforms');
+          if (idx >= 0 && parts[idx + 1]) {
+            platform = parts[idx + 1];
+          } else if (parts[0] === 'release-assets' && parts[1]) {
+            platform = parts[1];
+          }
+        }
         rows.push({
-          platform: app,
+          platform,
           lang,
           version: entry.version || '',
           date: entry.date || '',
@@ -66,7 +82,12 @@ async function buildRows(latest) {
 
 async function main() {
   const latest = await readLatest();
-  const rows = await buildRows(latest);
+  const repoSlug = process.env.GITHUB_REPOSITORY || '';
+  const refName =
+    process.env.GITHUB_REF_NAME ||
+    (process.env.GITHUB_REF ? process.env.GITHUB_REF.split('/').pop() : '') ||
+    'main';
+  const rows = await buildRows(latest, { repoSlug, refName });
 
   await fs.mkdir(siteDir, { recursive: true });
   await fs.copyFile(latestPath, path.join(siteDir, 'latest.json')).catch(() => {});
