@@ -1,0 +1,25 @@
+{
+  "remote_manifest_url": "https://raw.githubusercontent.com/CIMAFoundation/ngx-cima-landing-pages/main/webpages-manifest.json",
+  "apps": [
+    {
+      "id": "bricks-dev",
+      "label": "bricks-dev"
+    },
+    {
+      "id": "mydewetra-italy",
+      "label": "mydewetra-italy"
+    },
+    {
+      "id": "mydewetra-world",
+      "label": "mydewetra-world"
+    },
+    {
+      "id": "parco-cinque-terre",
+      "label": "parco-cinque-terre"
+    },
+    {
+      "id": "prevenzione-comune",
+      "label": "prevenzione-comune"
+    }
+  ]
+}
