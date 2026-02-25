@@ -1,0 +1,90 @@
+<main class="container py-4 py-lg-5">
+  <header class="mb-4 d-flex justify-content-between align-items-center">
+    <div>
+      <h1 class="display-6 fw-semibold mb-1">Inserimento documenti</h1>
+      <p class="text-secondary mb-0">Area protetta. Upload con drag and drop multi-file.</p>
+    </div>
+    <a routerLink="/documents" class="btn btn-outline-secondary btn-sm">Vai alla pagina pubblica</a>
+  </header>
+
+  <section class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+      <h2 class="h5 mb-3">Upload documenti</h2>
+
+      <form [formGroup]="uploadForm" class="row g-3 mb-3">
+        <div class="col-12 col-md-3">
+          <label class="form-label">Piattaforma</label>
+          <select class="form-select" formControlName="platform">
+            @for (platform of platformOptions; track platform.id) {
+            <option  [value]="platform.id">{{ platform.label }}</option>
+            }
+          </select>
+        </div>
+        <div class="col-12 col-md-3" *ngIf="lineOptions.length">
+          <label class="form-label">Linea</label>
+          <select class="form-select" formControlName="line">
+            <option value="">-</option>
+            @for (line of lineOptions; track line) {
+              <option [value]="line">{{ line }}</option>
+            }
+          </select>
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label">Tipo</label>
+          <select class="form-select" formControlName="docType">
+            <option value="terms">terms</option>
+            <option value="privacy">privacy</option>
+            <option value="cookie">cookie</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label">Lingua</label>
+          <select class="form-select" formControlName="lang">
+            @for (lang of langOptions; track lang) {
+              <option  [value]="lang">{{ lang }}</option>
+            }
+          </select>
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label">Data efficacia</label>
+          <input class="form-control" type="date" formControlName="effectiveDate" />
+        </div>
+      </form>
+
+      <div
+        class="dropzone mb-3"
+        [class.active]="dragActive"
+        (drop)="onDrop($event)"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave($event)"
+      >
+        <p class="mb-2">Trascina qui i file oppure selezionali manualmente.</p>
+        <input id="picker" class="d-none" type="file" multiple (change)="onPickFiles($event)" />
+        <label for="picker" class="btn btn-outline-primary btn-sm">Seleziona file</label>
+      </div>
+
+      <div class="mb-3" *ngIf="queuedFiles.length; else noFiles">
+        <div class="small text-secondary mb-2">{{ queuedFiles.length }} file in coda</div>
+        <ul class="list-group">
+          @for (file of queuedFiles; track file; let i = $index) {
+            <li
+              class="list-group-item d-flex justify-content-between align-items-center"
+
+            >
+              <span class="text-truncate pe-2">{{ file.name }}</span>
+              <button class="btn btn-sm btn-outline-danger" (click)="removeQueued(i)">Rimuovi</button>
+            </li>
+          }
+
+        </ul>
+      </div>
+      <ng-template #noFiles><p class="small text-secondary mb-3">Nessun file selezionato.</p></ng-template>
+
+      <button class="btn btn-primary" [disabled]="loading" (click)="uploadAll()">
+        {{ loading ? 'Upload in corso...' : 'Carica file in coda' }}
+      </button>
+
+      <p class="small mt-3 mb-0 text-secondary" *ngIf="uploadMessage">{{ uploadMessage }}</p>
+    </div>
+  </section>
+</main>

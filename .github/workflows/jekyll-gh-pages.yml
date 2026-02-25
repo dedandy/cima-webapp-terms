@@ -38,14 +38,14 @@ jobs:
           node-version: 20
       - name: Generate latest index
         run: |
-          node scripts/generate-latest.mjs
-          node scripts/generate-pages-index.mjs
+          node legacy-doc-pipeline/scripts/generate-latest.mjs
+          node legacy-doc-pipeline/scripts/generate-pages-index.mjs
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./_site
+          path: ./legacy-doc-pipeline/_site
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
   deploy:
     environment:

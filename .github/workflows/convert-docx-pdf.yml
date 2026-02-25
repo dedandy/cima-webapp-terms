@@ -27,7 +27,7 @@ jobs:
           from datetime import datetime
 
           repo = Path(".").resolve()
-          sources = list(repo.glob("platforms/**/source/*.docx"))
+          sources = list(repo.glob("legacy-doc-pipeline/platforms/**/source/*.docx"))
           if not sources:
             print("No DOCX sources found.")
             raise SystemExit(0)
@@ -49,7 +49,7 @@ jobs:
             lang = match.group("lang")
             version = match.group("ver")
 
-            target_dir = repo / "release-assets" / app / doctype / lang / date
+            target_dir = repo / "legacy-doc-pipeline" / "release-assets" / app / doctype / lang / date
             target_dir.mkdir(parents=True, exist_ok=True)
             out_pdf = target_dir / f"{app}_{doctype}_{date}_{lang}_{version}.pdf"
 
@@ -74,10 +74,10 @@ jobs:
 
       - name: Commit generated PDFs
         run: |
-          if git status --porcelain release-assets | grep -q .; then
+          if git status --porcelain legacy-doc-pipeline/release-assets | grep -q .; then
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add release-assets
+            git add legacy-doc-pipeline/release-assets
             git commit -m "chore: update PDFs [skip pdf]"
             git push
           else

@@ -1,0 +1,40 @@
+<div class="table-responsive">
+  <table class="table table-sm align-middle mb-0">
+    <thead>
+      <tr>
+        <th>File</th>
+        <th>Scope</th>
+        <th>Data</th>
+        <th>v</th>
+        <th>Hash</th>
+        <th>Stato</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngIf="!documents.length">
+        <td colspan="7" class="text-secondary">Nessun documento.</td>
+      </tr>
+      <tr *ngFor="let doc of documents; trackBy: trackById">
+        <td>{{ doc.originalFileName }}</td>
+        <td>{{ doc.platform }} / {{ doc.docType }} / {{ doc.lang }}</td>
+        <td>{{ doc.effectiveDate }}</td>
+        <td>{{ doc.version }}</td>
+        <td><code>{{ doc.sha256.slice(0, 10) }}...</code></td>
+        <td>
+          <span class="badge text-bg-danger" *ngIf="doc.deletedAt; else activeState">eliminato</span>
+          <ng-template #activeState><span class="badge text-bg-success">attivo</span></ng-template>
+        </td>
+        <td>
+          <button
+            class="btn btn-sm btn-outline-danger"
+            [disabled]="!canDelete || !!doc.deletedAt"
+            (click)="deleteRequested.emit(doc.id)"
+          >
+            Soft delete
+          </button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>

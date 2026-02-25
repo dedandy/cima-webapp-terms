@@ -1,0 +1,20 @@
+{
+  "documents": [
+    {
+      "id": "de1df424-82d6-4077-bb32-26f45b24b262",
+      "originalFileName": "terms.txt",
+      "storedFileName": "de1df424-82d6-4077-bb32-26f45b24b262_terms.txt",
+      "mimeType": "text/plain",
+      "sizeBytes": 18,
+      "sha256": "a450e9ab05f33b3410a0a6e24f559793179f6629640b6ca582806230d27400b2",
+      "platform": "bricks-dev",
+      "docType": "terms",
+      "lang": "it_IT",
+      "effectiveDate": "2026-02-25",
+      "version": 1,
+      "createdAt": "2026-02-25T10:55:28.894Z",
+      "updatedAt": "2026-02-25T10:56:13.134Z",
+      "deletedAt": "2026-02-25T10:56:13.134Z"
+    }
+  ]
+}

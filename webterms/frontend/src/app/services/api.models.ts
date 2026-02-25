@@ -1,0 +1,33 @@
+export interface DocumentDto {
+  id: string;
+  originalFileName: string;
+  sha256: string;
+  platform: string;
+  docType: 'terms' | 'privacy' | 'cookie';
+  lang: string;
+  effectiveDate: string;
+  version: number;
+  deletedAt: string | null;
+}
+
+export interface DocumentsResponse {
+  documents: DocumentDto[];
+}
+
+export interface PlatformOption {
+  id: string;
+  label: string;
+}
+
+export interface InfraConfigResponse {
+  lines: string[];
+  platforms: PlatformOption[];
+  languages: string[];
+  source: string;
+}
+
+export interface LoginResponse {
+  token: string;
+  user?: { username: string };
+  source?: string;
+}
