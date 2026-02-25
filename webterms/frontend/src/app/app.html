@@ -3,9 +3,10 @@
     <a class="navbar-brand fw-semibold" routerLink="/documents">WebTerms</a>
     <div class="navbar-nav gap-2">
       <a class="nav-link" routerLink="/documents" routerLinkActive="active">Documenti</a>
+      <a class="nav-link" routerLink="/official-documents" routerLinkActive="active">Ufficiali</a>
       <a class="nav-link" routerLink="/upload" routerLinkActive="active">Inserimento</a>
       @if (isAuthenticated()) {
-      <button type="button" class="btn btn-outline-secondary " routerLink="/profile" routerLinkActive="active" (click)="logout()">Logout</button>
+      <button type="button" class="btn btn-outline-secondary" (click)="logout()">Logout</button>
       }
 
     </div>

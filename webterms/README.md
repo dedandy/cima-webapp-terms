@@ -20,6 +20,7 @@ Frontend Angular + Bootstrap e API Node minimale per upload/lista documenti lega
 - `webterms/frontend`: applicazione Angular.
 - `webterms/frontend/src/app/pages/login`: pagina login.
 - `webterms/frontend/src/app/pages/documents`: pagina pubblica lista documenti.
+- `webterms/frontend/src/app/pages/official`: pagina read-only dei documenti ufficiali (`latest.json`).
 - `webterms/frontend/src/app/pages/upload`: pagina inserimento/upload (protetta da login).
 - `webterms/frontend/src/app/components/documents-list`: tabella documenti riusabile.
 - `webterms/frontend/src/app/services`: `api.service` + `auth.service`.
@@ -33,12 +34,20 @@ Frontend Angular + Bootstrap e API Node minimale per upload/lista documenti lega
 - `POST /api/documents/upload`
 - `GET /api/documents`
 - `DELETE /api/documents/:id`
+- `GET /api/documents/:id/download` (download PDF)
+- `GET /api/public/latest.json` (manifest pubblico latest)
+- `GET /api/public/:docType_:platform_:lang.pdf` (URL pubblico stabile latest)
 - `POST /api/mockup/login`
 - `GET /api/mockup/config`
 
 Compatibile anche con prefisso path pubblicazione:
 
 - `/webterms/api/...`
+
+PDF pubblici (senza autenticazione):
+
+- `/webterms/api/public/latest.json`
+- `/webterms/api/public/{docType}_{platform}_{lang}.pdf`
 
 ## Login e configurazioni mockup/infrastruttura
 
@@ -60,6 +69,7 @@ Variabili ambiente backend opzionali:
 - `MOCKUP_LOGIN_PATH` (default `/auth/login`)
 - `MOCKUP_CONFIG_PATH` (default `/config`)
 - `MOCKUP_SERVICE_TOKEN` (token tecnico per fetch config)
+- `WEBTERMS_CONVERTER_URL` (es. `http://127.0.0.1:3001`, converter Docker)
 
 ## Modello dati documento
 
@@ -72,6 +82,7 @@ Ogni record in `documents` contiene:
 - `sizeBytes`
 - `sha256`
 - `platform`
+- `line`
 - `docType` (`terms|privacy|cookie`)
 - `lang`
 - `effectiveDate` (`YYYY-MM-DD`)
@@ -86,6 +97,28 @@ Prerequisiti consigliati:
 
 - Node.js LTS pari (es. `20.x` o `22.x`)
 - npm `>=10`
+- Converter PDF:
+  - opzionale `soffice` locale, oppure
+  - consigliato servizio Docker esterno (Gotenberg) via `WEBTERMS_CONVERTER_URL`
+
+### Converter Docker (consigliato)
+
+Avvio locale/produzione del convertitore:
+
+```bash
+cd webterms
+docker compose -f docker-compose.converter.yml up -d
+```
+
+Configurazione backend:
+
+```bash
+cd webterms/api
+export WEBTERMS_CONVERTER_URL="http://127.0.0.1:3001"
+npm run dev
+```
+
+Con questa configurazione, il backend converte DOCX/RTF/ODT ecc. in PDF chiamando il servizio Docker.
 
 Nota: con Node dispari (`v25.x`) la build Angular puo' fallire.
 
@@ -122,6 +155,7 @@ FE su `http://localhost:4200`.
 Routing FE:
 
 - `/documents` pagina pubblica lista documenti
+- `/official-documents` vista ufficiale dei file latest esposti
 - `/upload` inserimento documenti (richiede login)
 - `/login` autenticazione
 

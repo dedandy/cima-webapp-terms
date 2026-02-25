@@ -5,25 +5,38 @@
         <th>File</th>
         <th>Scope</th>
         <th>Data</th>
-        <th>v</th>
+        <th>Version</th>
         <th>Hash</th>
         <th>Stato</th>
+        <th>Download</th>
         <th></th>
       </tr>
     </thead>
     <tbody>
-      <tr *ngIf="!documents.length">
-        <td colspan="7" class="text-secondary">Nessun documento.</td>
+    @if (!documents.length) {
+      <tr >
+        <td colspan="8" class="text-secondary">Nessun documento.</td>
       </tr>
-      <tr *ngFor="let doc of documents; trackBy: trackById">
-        <td>{{ doc.originalFileName }}</td>
+    }
+    @for (doc of documents; track trackById($index, doc)) {
+      <tr >
+        <td>
+          <div class="fw-semibold">{{ doc.downloadFileName || doc.originalFileName }}</div>
+          <div class="small text-secondary">{{ doc.originalFileName }}</div>
+        </td>
         <td>{{ doc.platform }} / {{ doc.docType }} / {{ doc.lang }}</td>
         <td>{{ doc.effectiveDate }}</td>
-        <td>{{ doc.version }}</td>
+        <td>v{{ String(doc.version).padStart(3, '0') }}</td>
         <td><code>{{ doc.sha256.slice(0, 10) }}...</code></td>
         <td>
-          <span class="badge text-bg-danger" *ngIf="doc.deletedAt; else activeState">eliminato</span>
-          <ng-template #activeState><span class="badge text-bg-success">attivo</span></ng-template>
+          @if (doc.deletedAt) {
+          <span class="badge text-bg-danger" *ngIf="doc.deletedAt">eliminato</span>
+          } @else {
+           <span class="badge text-bg-success">attivo</span>
+          }
+        </td>
+        <td>
+          <a class="btn btn-sm btn-outline-primary" [href]="'api/documents/' + doc.id + '/download'">Scarica</a>
         </td>
         <td>
           <button
@@ -35,6 +48,8 @@
           </button>
         </td>
       </tr>
+    }
+
     </tbody>
   </table>
 </div>

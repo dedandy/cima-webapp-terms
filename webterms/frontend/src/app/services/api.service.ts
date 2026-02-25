@@ -4,7 +4,8 @@ import { Observable } from 'rxjs';
 import {
   DocumentsResponse,
   InfraConfigResponse,
-  LoginResponse
+  LoginResponse,
+  PublicLatestResponse
 } from './api.models';
 import { AuthService } from './auth.service';
 
@@ -48,6 +49,10 @@ export class ApiService {
 
   softDelete(documentId: string): Observable<unknown> {
     return this.http.delete(`${this.apiBaseUrl}/documents/${documentId}`);
+  }
+
+  getPublicLatest(): Observable<PublicLatestResponse> {
+    return this.http.get<PublicLatestResponse>(`${this.apiBaseUrl}/public/latest.json`);
   }
 
   private buildAuthHeaders(): HttpHeaders | undefined {

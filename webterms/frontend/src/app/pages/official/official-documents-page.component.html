@@ -1,0 +1,48 @@
+<main class="container py-4 py-lg-5">
+  <header class="mb-4">
+    <h1 class="display-6 fw-semibold mb-1">Documenti ufficiali esposti</h1>
+    <p class="text-secondary mb-0">
+      Vista del file pubblico latest usato da landing-pages/portali.
+    </p>
+  </header>
+
+  <section class="card border-0 shadow-sm">
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Linea</th>
+              <th>Piattaforma</th>
+              <th>Tipo</th>
+              <th>Lingua</th>
+              <th>Versione</th>
+              <th>Data</th>
+              <th>PDF pubblico</th>
+              <th>Download id</th>
+            </tr>
+          </thead>
+          <tbody>
+            @if (!rows.length) {
+              <tr>
+                <td colspan="8" class="text-secondary">Nessun documento ufficiale disponibile.</td>
+              </tr>
+            }
+            @for (row of rows; track trackByKey($index, row)) {
+              <tr>
+                <td>{{ row.line }}</td>
+                <td>{{ row.platform }}</td>
+                <td>{{ row.docType }}</td>
+                <td>{{ row.lang }}</td>
+                <td>{{ formatVersion(row.version) }}</td>
+                <td>{{ row.effectiveDate }}</td>
+                <td><a [href]="row.publicUrl" target="_blank" rel="noopener">latest</a></td>
+                <td><a [href]="row.downloadUrl" target="_blank" rel="noopener">by id</a></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>

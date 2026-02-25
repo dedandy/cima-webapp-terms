@@ -1,7 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { execFile } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import http from 'node:http';
+import os from 'node:os';
 import path from 'node:path';
+import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -20,6 +23,7 @@ const MOCKUP_API_BASE_URL = process.env.MOCKUP_API_BASE_URL || '';
 const MOCKUP_LOGIN_PATH = process.env.MOCKUP_LOGIN_PATH || '/auth/login';
 const MOCKUP_CONFIG_PATH = process.env.MOCKUP_CONFIG_PATH || '/config';
 const MOCKUP_SERVICE_TOKEN = process.env.MOCKUP_SERVICE_TOKEN || '';
+const CONVERTER_URL = process.env.WEBTERMS_CONVERTER_URL || '';
 const sessionTokens = new Map();
 
 const CORS_HEADERS = {
@@ -29,6 +33,40 @@ const CORS_HEADERS = {
 };
 
 const DOC_TYPES = new Set(['terms', 'privacy', 'cookie']);
+const execFileAsync = promisify(execFile);
+
+async function detectConverterHealth() {
+  if (CONVERTER_URL) {
+    try {
+      const healthUrl = `${CONVERTER_URL.replace(/\/$/, '')}/health`;
+      const response = await fetch(healthUrl, { method: 'GET' });
+      return {
+        mode: 'docker',
+        configuredUrl: CONVERTER_URL,
+        reachable: response.ok
+      };
+    } catch {
+      return {
+        mode: 'docker',
+        configuredUrl: CONVERTER_URL,
+        reachable: false
+      };
+    }
+  }
+
+  try {
+    await execFileAsync('soffice', ['--version'], { timeout: 5000 });
+    return {
+      mode: 'local',
+      reachable: true
+    };
+  } catch {
+    return {
+      mode: 'none',
+      reachable: false
+    };
+  }
+}
 
 async function ensureDataStore() {
   await fs.mkdir(path.dirname(DATA_FILE), { recursive: true });
@@ -64,6 +102,60 @@ function safeFileName(fileName) {
     .toLowerCase();
 }
 
+async function convertToPdfIfNeeded(fileBuffer, originalFileName) {
+  const extension = path.extname(originalFileName).toLowerCase();
+  if (extension === '.pdf') {
+    return { pdfBuffer: fileBuffer, converted: false };
+  }
+
+  if (CONVERTER_URL) {
+    try {
+      const form = new FormData();
+      form.append('files', new Blob([fileBuffer]), path.basename(originalFileName));
+      const endpoint = `${CONVERTER_URL.replace(/\/$/, '')}/forms/libreoffice/convert`;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        body: form
+      });
+      if (!response.ok) {
+        throw new Error(`converter_http_${response.status}`);
+      }
+      const output = Buffer.from(await response.arrayBuffer());
+      if (!output.length) {
+        throw new Error('empty_pdf');
+      }
+      return { pdfBuffer: output, converted: true };
+    } catch {
+      throw new Error('Cannot convert file to PDF via converter service.');
+    }
+  }
+
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'webterms-convert-'));
+  const tempInputPath = path.join(tempDir, path.basename(originalFileName));
+  const baseName = path.basename(originalFileName, extension);
+  const tempOutputPath = path.join(tempDir, `${baseName}.pdf`);
+
+  try {
+    await fs.writeFile(tempInputPath, fileBuffer);
+    await execFileAsync('soffice', [
+      '--headless',
+      '--convert-to',
+      'pdf',
+      '--outdir',
+      tempDir,
+      tempInputPath
+    ], { timeout: 120000 });
+    const pdfBuffer = await fs.readFile(tempOutputPath);
+    return { pdfBuffer, converted: true };
+  } catch {
+    throw new Error(
+      'Cannot convert file to PDF. Configure WEBTERMS_CONVERTER_URL or install LibreOffice (soffice).'
+    );
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+}
+
 function parseBody(req) {
   return new Promise((resolve, reject) => {
     let body = '';
@@ -91,6 +183,7 @@ function parseBody(req) {
 
 function normalizeDoc(input) {
   const platform = String(input.platform || '').trim().toLowerCase();
+  const line = String(input.line || '').trim().toLowerCase();
   const docType = String(input.docType || '').trim().toLowerCase();
   const lang = String(input.lang || '').trim();
   const effectiveDate = String(input.effectiveDate || '').trim();
@@ -108,13 +201,14 @@ function normalizeDoc(input) {
     throw new Error('effectiveDate must be YYYY-MM-DD');
   }
 
-  return { platform, docType, lang, effectiveDate };
+  return { platform, line, docType, lang, effectiveDate };
 }
 
 function buildVersion(documents, seed) {
   const matches = documents.filter((doc) => {
     return (
       doc.platform === seed.platform &&
+      (doc.line || '') === (seed.line || '') &&
       doc.docType === seed.docType &&
       doc.lang === seed.lang &&
       doc.effectiveDate === seed.effectiveDate
@@ -131,6 +225,86 @@ function withComputedFields(doc) {
   };
 }
 
+function compareByRecency(a, b) {
+  const dateCmp = String(a.effectiveDate || '').localeCompare(String(b.effectiveDate || ''));
+  if (dateCmp !== 0) {
+    return dateCmp;
+  }
+  const versionCmp = Number(a.version || 0) - Number(b.version || 0);
+  if (versionCmp !== 0) {
+    return versionCmp;
+  }
+  return String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
+}
+
+function buildPublicLatest(documents) {
+  const active = documents.filter((doc) => !doc.deletedAt);
+  const latestMap = new Map();
+  for (const doc of active) {
+    const key = `${doc.platform}|${doc.line || ''}|${doc.docType}|${doc.lang}`;
+    const prev = latestMap.get(key);
+    if (!prev || compareByRecency(prev, doc) < 0) {
+      latestMap.set(key, doc);
+    }
+  }
+
+  const latest = {};
+  for (const doc of latestMap.values()) {
+    latest[doc.platform] = latest[doc.platform] || {};
+    latest[doc.platform][doc.docType] = latest[doc.platform][doc.docType] || {};
+    latest[doc.platform][doc.docType][doc.lang] = {
+      id: doc.id,
+      line: doc.line || '',
+      version: doc.version,
+      effectiveDate: doc.effectiveDate,
+      sha256: doc.sha256,
+      url: `/webterms/api/public/${doc.docType}_${doc.platform}_${doc.lang}.pdf`,
+      downloadUrl: `/webterms/api/documents/${doc.id}/download`
+    };
+  }
+  return latest;
+}
+
+async function resolvePdfForDocument(db, document) {
+  const filePath = path.join(STORAGE_DIR, document.storedFileName);
+  const rawBuffer = await fs.readFile(filePath);
+
+  const alreadyPdf =
+    String(document.mimeType || '').toLowerCase() === 'application/pdf' &&
+    String(document.storedFileName || '').toLowerCase().endsWith('.pdf');
+  if (alreadyPdf) {
+    return { pdfBuffer: rawBuffer, fileName: document.downloadFileName || 'document.pdf' };
+  }
+
+  const conversion = await convertToPdfIfNeeded(rawBuffer, document.originalFileName || document.storedFileName);
+  const standardizedBaseName = `${document.docType}_${document.platform}_${document.lang}`;
+  const downloadFileName = `${safeFileName(standardizedBaseName)}.pdf`;
+  const storedFileName = `${document.id}_${downloadFileName}`;
+  const newPath = path.join(STORAGE_DIR, storedFileName);
+  await fs.writeFile(newPath, conversion.pdfBuffer);
+  if (storedFileName !== document.storedFileName) {
+    await fs.rm(filePath, { force: true });
+  }
+
+  const now = new Date().toISOString();
+  const index = db.documents.findIndex((item) => item.id === document.id);
+  const updated = {
+    ...document,
+    storedFileName,
+    downloadFileName,
+    originalMimeType: document.originalMimeType || document.mimeType || 'application/octet-stream',
+    mimeType: 'application/pdf',
+    sizeBytes: conversion.pdfBuffer.byteLength,
+    sha256: createHash('sha256').update(conversion.pdfBuffer).digest('hex'),
+    convertedToPdf: true,
+    updatedAt: now
+  };
+  db.documents[index] = updated;
+  await writeDb(db);
+
+  return { pdfBuffer: conversion.pdfBuffer, fileName: downloadFileName };
+}
+
 function filterDocuments(allDocuments, query) {
   return allDocuments.filter((doc) => {
     if (!query.includeDeleted && doc.deletedAt) {
@@ -138,6 +312,9 @@ function filterDocuments(allDocuments, query) {
     }
 
     if (query.platform && doc.platform !== query.platform) {
+      return false;
+    }
+    if (query.line && (doc.line || '') !== query.line) {
       return false;
     }
     if (query.docType && doc.docType !== query.docType) {
@@ -160,6 +337,7 @@ function parseQuery(url) {
   const parsed = new URL(url, 'http://localhost');
   return {
     platform: parsed.searchParams.get('platform')?.trim().toLowerCase() || '',
+    line: parsed.searchParams.get('line')?.trim().toLowerCase() || '',
     docType: parsed.searchParams.get('docType')?.trim().toLowerCase() || '',
     lang: parsed.searchParams.get('lang')?.trim() || '',
     search: parsed.searchParams.get('search')?.trim().toLowerCase() || '',
@@ -354,9 +532,35 @@ async function handleUpload(req, res) {
     return;
   }
 
-  const sha256 = createHash('sha256').update(fileBuffer).digest('hex');
+  let conversion;
+  try {
+    conversion = await convertToPdfIfNeeded(fileBuffer, fileName);
+  } catch (error) {
+    json(res, 422, { error: error.message });
+    return;
+  }
+
+  const sourceSha256 = createHash('sha256').update(fileBuffer).digest('hex');
+  const pdfBuffer = conversion.pdfBuffer;
+  const sha256 = createHash('sha256').update(pdfBuffer).digest('hex');
   const db = await readDb();
-  const duplicate = db.documents.find((doc) => doc.sha256 === sha256 && !doc.deletedAt);
+  const duplicate = db.documents.find((doc) => {
+    if (doc.deletedAt) {
+      return false;
+    }
+    const sameScope =
+      doc.platform === normalized.platform &&
+      (doc.line || '') === (normalized.line || '') &&
+      doc.docType === normalized.docType &&
+      doc.lang === normalized.lang &&
+      doc.effectiveDate === normalized.effectiveDate;
+    if (!sameScope) {
+      return false;
+    }
+    const sameSource = doc.sourceSha256 && doc.sourceSha256 === sourceSha256;
+    const samePdf = doc.sha256 === sha256;
+    return sameSource || samePdf;
+  });
   if (duplicate) {
     json(res, 409, {
       error: 'Duplicate document content',
@@ -366,26 +570,31 @@ async function handleUpload(req, res) {
   }
 
   const id = randomUUID();
-  const extension = path.extname(fileName);
-  const baseName = path.basename(fileName, extension);
-  const storedFileName = `${id}_${safeFileName(baseName)}${extension.toLowerCase()}`;
+  const standardizedBaseName = `${normalized.docType}_${normalized.platform}_${normalized.lang}`;
+  const downloadFileName = `${safeFileName(standardizedBaseName)}.pdf`;
+  const storedFileName = `${id}_${downloadFileName}`;
   const storagePath = path.join(STORAGE_DIR, storedFileName);
-  await fs.writeFile(storagePath, fileBuffer);
+  await fs.writeFile(storagePath, pdfBuffer);
 
   const now = new Date().toISOString();
   const version = buildVersion(db.documents, normalized);
   const documentRecord = {
     id,
     originalFileName: fileName,
+    downloadFileName,
     storedFileName,
-    mimeType: String(payload.mimeType || 'application/octet-stream'),
-    sizeBytes: fileBuffer.byteLength,
+    originalMimeType: String(payload.mimeType || 'application/octet-stream'),
+    sourceSha256,
+    mimeType: 'application/pdf',
+    sizeBytes: pdfBuffer.byteLength,
     sha256,
     platform: normalized.platform,
+    line: normalized.line,
     docType: normalized.docType,
     lang: normalized.lang,
     effectiveDate: normalized.effectiveDate,
     version,
+    convertedToPdf: conversion.converted,
     createdAt: now,
     updatedAt: now,
     deletedAt: null
@@ -428,6 +637,75 @@ async function handleSoftDelete(req, res, id) {
   json(res, 200, { document: withComputedFields(db.documents[index]) });
 }
 
+async function handleDownload(req, res, id) {
+  const db = await readDb();
+  const document = db.documents.find((doc) => doc.id === id);
+  if (!document) {
+    json(res, 404, { error: 'Document not found' });
+    return;
+  }
+
+  try {
+    const { pdfBuffer, fileName } = await resolvePdfForDocument(db, document);
+    res.writeHead(200, {
+      ...CORS_HEADERS,
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${fileName || 'document.pdf'}"`
+    });
+    res.end(pdfBuffer);
+  } catch (error) {
+    json(res, 422, { error: error.message || 'Stored file not found or cannot be converted to PDF' });
+  }
+}
+
+async function handlePublicLatest(req, res) {
+  const db = await readDb();
+  json(res, 200, { latest: buildPublicLatest(db.documents) });
+}
+
+async function handlePublicLatestPdf(req, res, platform, docType, lang) {
+  const db = await readDb();
+  const candidates = db.documents.filter((doc) => {
+    return (
+      !doc.deletedAt &&
+      doc.platform === platform &&
+      doc.docType === docType &&
+      doc.lang === lang
+    );
+  });
+  if (!candidates.length) {
+    json(res, 404, { error: 'No document found for requested scope' });
+    return;
+  }
+  const latestDoc = candidates.sort(compareByRecency).at(-1);
+  try {
+    const { pdfBuffer, fileName } = await resolvePdfForDocument(db, latestDoc);
+    res.writeHead(200, {
+      ...CORS_HEADERS,
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="${fileName || 'document.pdf'}"`,
+      'Cache-Control': 'public, max-age=60'
+    });
+    res.end(pdfBuffer);
+  } catch (error) {
+    json(res, 422, { error: error.message || 'Stored file not found or cannot be converted to PDF' });
+  }
+}
+
+async function handlePublicLatestPdfByName(req, res, fileSlug) {
+  const match = /^([a-z0-9_-]+)_([a-z0-9_-]+)_([a-zA-Z_]+)$/.exec(fileSlug);
+  if (!match) {
+    json(res, 404, { error: 'Invalid public filename format' });
+    return;
+  }
+  const [, docType, platform, lang] = match;
+  if (!DOC_TYPES.has(docType)) {
+    json(res, 404, { error: 'Invalid docType in public filename' });
+    return;
+  }
+  await handlePublicLatestPdf(req, res, platform, docType, lang);
+}
+
 async function requestHandler(req, res) {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, CORS_HEADERS);
@@ -443,7 +721,11 @@ async function requestHandler(req, res) {
       : url.pathname;
 
     if (req.method === 'GET' && normalizedPath === '/api/health') {
-      json(res, 200, { status: 'ok' });
+      const converter = await detectConverterHealth();
+      json(res, 200, {
+        status: 'ok',
+        converter
+      });
       return;
     }
 
@@ -470,6 +752,39 @@ async function requestHandler(req, res) {
     const deleteMatch = normalizedPath.match(/^\/api\/documents\/([a-zA-Z0-9-]+)$/);
     if (req.method === 'DELETE' && deleteMatch) {
       await handleSoftDelete(req, res, deleteMatch[1]);
+      return;
+    }
+
+    const downloadMatch = normalizedPath.match(/^\/api\/documents\/([a-zA-Z0-9-]+)\/download$/);
+    if (req.method === 'GET' && downloadMatch) {
+      await handleDownload(req, res, downloadMatch[1]);
+      return;
+    }
+
+    if (req.method === 'GET' && normalizedPath === '/api/public/latest.json') {
+      await handlePublicLatest(req, res);
+      return;
+    }
+
+    const publicLatestMatch = normalizedPath.match(
+      /^\/api\/public\/([a-zA-Z0-9_-]+)\/(terms|privacy|cookie)\/([a-zA-Z_]+)\.pdf$/
+    );
+    if (req.method === 'GET' && publicLatestMatch) {
+      await handlePublicLatestPdf(
+        req,
+        res,
+        publicLatestMatch[1].toLowerCase(),
+        publicLatestMatch[2].toLowerCase(),
+        publicLatestMatch[3]
+      );
+      return;
+    }
+
+    const publicLatestByNameMatch = normalizedPath.match(
+      /^\/api\/public\/([a-zA-Z0-9_-]+)\.pdf$/
+    );
+    if (req.method === 'GET' && publicLatestByNameMatch) {
+      await handlePublicLatestPdfByName(req, res, publicLatestByNameMatch[1].toLowerCase());
       return;
     }
 

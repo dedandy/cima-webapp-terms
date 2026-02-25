@@ -1,6 +1,8 @@
 export interface DocumentDto {
   id: string;
+  downloadFileName?: string;
   originalFileName: string;
+  line?: string;
   sha256: string;
   platform: string;
   docType: 'terms' | 'privacy' | 'cookie';
@@ -30,4 +32,18 @@ export interface LoginResponse {
   token: string;
   user?: { username: string };
   source?: string;
+}
+
+export interface PublicLatestEntry {
+  id: string;
+  line: string;
+  version: number;
+  effectiveDate: string;
+  sha256: string;
+  url: string;
+  downloadUrl: string;
+}
+
+export interface PublicLatestResponse {
+  latest: Record<string, Record<string, Record<string, PublicLatestEntry>>>;
 }

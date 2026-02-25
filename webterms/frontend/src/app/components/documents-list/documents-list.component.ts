@@ -16,4 +16,6 @@ export class DocumentsListComponent {
   trackById(_: number, item: DocumentDto): string {
     return item.id;
   }
+
+  protected readonly String = String;
 }

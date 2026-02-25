@@ -91,6 +91,13 @@ export class UploadPageComponent {
         await firstValueFrom(this.api.uploadDocument(payload));
         results.push(`OK: ${file.name}`);
       } catch (error: any) {
+        if (error?.status === 401) {
+          this.auth.clearToken();
+          this.uploadMessage = 'Sessione scaduta o non valida. Effettua di nuovo il login.';
+          this.router.navigate(['/login']);
+          this.loading = false;
+          return;
+        }
         const duplicateId = error?.error?.duplicateDocumentId;
         results.push(duplicateId ? `DUP: ${file.name} (id ${duplicateId})` : `ERR: ${file.name}`);
       }
