@@ -3,9 +3,10 @@ import { Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { ApiService } from '../../services/api.service';
-import { AuthService } from '../../services/auth.service';
 import { PlatformOption } from '../../services/api.models';
+import { AuthService } from '../../services/auth.service';
+import { ConfigApiService } from '../../services/config-api.service';
+import { DocumentsApiService } from '../../services/documents-api.service';
 
 @Component({
   selector: 'app-upload-page',
@@ -15,7 +16,8 @@ import { PlatformOption } from '../../services/api.models';
   styleUrl: './upload-page.component.scss'
 })
 export class UploadPageComponent {
-  private readonly api = inject(ApiService);
+  private readonly configApi = inject(ConfigApiService);
+  private readonly documentsApi = inject(DocumentsApiService);
   private readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
@@ -88,7 +90,7 @@ export class UploadPageComponent {
           mimeType: file.type || 'application/octet-stream',
           contentBase64: await this.readFileAsBase64(file)
         };
-        await firstValueFrom(this.api.uploadDocument(payload));
+        await firstValueFrom(this.documentsApi.uploadDocument(payload));
         results.push(`OK: ${file.name}`);
       } catch (error: any) {
         if (error?.status === 401) {
@@ -110,15 +112,15 @@ export class UploadPageComponent {
 
   private async loadConfig(): Promise<void> {
     try {
-      const cfg = await firstValueFrom(this.api.getInfraConfig());
+      const cfg = await firstValueFrom(this.configApi.getInfraConfig());
       this.platformOptions = cfg.platforms || [];
       this.lineOptions = cfg.lines || [];
       this.langOptions = cfg.languages?.length ? cfg.languages : this.langOptions;
-      const firstPlatform = this.platformOptions[0]?.id || 'bricks-dev';
+      const firstPlatform = this.platformOptions[0]?.id || '';
       this.uploadForm.patchValue({ platform: firstPlatform });
     } catch {
-      this.platformOptions = [{ id: 'bricks-dev', label: 'bricks-dev' }];
-      this.uploadForm.patchValue({ platform: 'bricks-dev' });
+      this.platformOptions = [];
+      this.uploadForm.patchValue({ platform: '' });
     }
   }
 

@@ -3,9 +3,10 @@ import { Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { DocumentsListComponent } from '../../components/documents-list/documents-list.component';
-import { ApiService } from '../../services/api.service';
-import { AuthService } from '../../services/auth.service';
 import { DocumentDto, PlatformOption } from '../../services/api.models';
+import { AuthService } from '../../services/auth.service';
+import { ConfigApiService } from '../../services/config-api.service';
+import { DocumentsApiService } from '../../services/documents-api.service';
 
 @Component({
   selector: 'app-documents-page',
@@ -14,7 +15,8 @@ import { DocumentDto, PlatformOption } from '../../services/api.models';
   templateUrl: './documents-page.component.html'
 })
 export class DocumentsPageComponent {
-  private readonly api = inject(ApiService);
+  private readonly configApi = inject(ConfigApiService);
+  private readonly documentsApi = inject(DocumentsApiService);
   private readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
 
@@ -40,7 +42,7 @@ export class DocumentsPageComponent {
     if (!this.auth.isAuthenticated()) {
       return;
     }
-    await firstValueFrom(this.api.softDelete(documentId));
+    await firstValueFrom(this.documentsApi.softDelete(documentId));
     await this.loadDocuments();
   }
 
@@ -50,7 +52,7 @@ export class DocumentsPageComponent {
 
   private async loadConfig(): Promise<void> {
     try {
-      const cfg = await firstValueFrom(this.api.getInfraConfig());
+      const cfg = await firstValueFrom(this.configApi.getInfraConfig());
       this.platforms = cfg.platforms || [];
       this.languages = cfg.languages?.length ? cfg.languages : this.languages;
     } catch {
@@ -61,7 +63,7 @@ export class DocumentsPageComponent {
   private async loadDocuments(): Promise<void> {
     const formValue = this.filterForm.getRawValue();
     const response = await firstValueFrom(
-      this.api.getDocuments({
+      this.documentsApi.getDocuments({
         search: formValue.search || undefined,
         platform: formValue.platform || undefined,
         docType: formValue.docType || undefined,

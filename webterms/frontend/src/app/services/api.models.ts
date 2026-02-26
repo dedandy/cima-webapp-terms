@@ -34,6 +34,10 @@ export interface LoginResponse {
   source?: string;
 }
 
+export interface MeResponse {
+  user?: Record<string, unknown>;
+}
+
 export interface PublicLatestEntry {
   id: string;
   line: string;

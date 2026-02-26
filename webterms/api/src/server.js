@@ -13,18 +13,15 @@ const ROOT_DIR = path.resolve(__dirname, '..');
 const DATA_FILE = path.join(ROOT_DIR, 'data', 'db.json');
 const STORAGE_DIR = path.join(ROOT_DIR, 'storage');
 const FRONTEND_DIST_DIR = path.resolve(ROOT_DIR, '..', 'frontend', 'dist', 'frontend', 'browser');
-const META_APPS_FILE = path.resolve(ROOT_DIR, '..', '..', 'legacy-doc-pipeline', 'meta', 'apps.json');
 
 const PORT = Number(process.env.PORT || 8787);
 const REQUIRE_LOGIN = process.env.WEBTERMS_REQUIRE_LOGIN !== 'false';
-const DEV_LOGIN_USER = process.env.WEBTERMS_DEV_USER || 'dev';
-const DEV_LOGIN_PASS = process.env.WEBTERMS_DEV_PASS || 'dev4portal';
 const MOCKUP_API_BASE_URL = process.env.MOCKUP_API_BASE_URL || '';
 const MOCKUP_LOGIN_PATH = process.env.MOCKUP_LOGIN_PATH || '/auth/login';
 const MOCKUP_CONFIG_PATH = process.env.MOCKUP_CONFIG_PATH || '/config';
+const MOCKUP_ME_PATH = process.env.MOCKUP_ME_PATH || '/auth/me';
 const MOCKUP_SERVICE_TOKEN = process.env.MOCKUP_SERVICE_TOKEN || '';
 const CONVERTER_URL = process.env.WEBTERMS_CONVERTER_URL || '';
-const sessionTokens = new Map();
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -75,14 +72,17 @@ async function ensureDataStore() {
   try {
     await fs.access(DATA_FILE);
   } catch {
-    await fs.writeFile(DATA_FILE, JSON.stringify({ documents: [] }, null, 2), 'utf8');
+    await fs.writeFile(DATA_FILE, JSON.stringify({ documents: [], publicationJobs: [] }, null, 2), 'utf8');
   }
 }
 
 async function readDb() {
   const raw = await fs.readFile(DATA_FILE, 'utf8');
   const parsed = JSON.parse(raw || '{}');
-  return { documents: Array.isArray(parsed.documents) ? parsed.documents : [] };
+  return {
+    documents: Array.isArray(parsed.documents) ? parsed.documents : [],
+    publicationJobs: Array.isArray(parsed.publicationJobs) ? parsed.publicationJobs : []
+  };
 }
 
 async function writeDb(db) {
@@ -225,6 +225,13 @@ function withComputedFields(doc) {
   };
 }
 
+function withComputedPublicationFields(job) {
+  return {
+    ...job,
+    isTerminal: job.status === 'merged' || job.status === 'failed'
+  };
+}
+
 function compareByRecency(a, b) {
   const dateCmp = String(a.effectiveDate || '').localeCompare(String(b.effectiveDate || ''));
   if (dateCmp !== 0) {
@@ -345,20 +352,6 @@ function parseQuery(url) {
   };
 }
 
-async function readAppsFallback() {
-  try {
-    const raw = await fs.readFile(META_APPS_FILE, 'utf8');
-    const parsed = JSON.parse(raw);
-    const apps = Array.isArray(parsed.apps) ? parsed.apps : [];
-    return apps.map((item) => ({
-      id: String(item.id || '').trim(),
-      label: String(item.label || item.id || '').trim()
-    }));
-  } catch {
-    return [];
-  }
-}
-
 function extractBearerToken(req) {
   const header = String(req.headers.authorization || '');
   if (!header.toLowerCase().startsWith('bearer ')) {
@@ -367,12 +360,31 @@ function extractBearerToken(req) {
   return header.slice(7).trim();
 }
 
-function isAuthorized(req) {
+async function fetchRemoteUser(token) {
+  if (!MOCKUP_API_BASE_URL || !token) {
+    return null;
+  }
+  try {
+    const response = await fetch(`${MOCKUP_API_BASE_URL}${MOCKUP_ME_PATH}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!response.ok) {
+      return null;
+    }
+    const body = await response.json().catch(() => ({}));
+    return body?.user || body || null;
+  } catch {
+    return null;
+  }
+}
+
+async function isAuthorized(req) {
   if (!REQUIRE_LOGIN) {
     return true;
   }
   const token = extractBearerToken(req);
-  return Boolean(token && sessionTokens.has(token));
+  const user = await fetchRemoteUser(token);
+  return Boolean(user);
 }
 
 async function handleMockupLogin(req, res) {
@@ -385,62 +397,53 @@ async function handleMockupLogin(req, res) {
     return;
   }
 
-  if (MOCKUP_API_BASE_URL) {
-    try {
-      const remoteResponse = await fetch(`${MOCKUP_API_BASE_URL}${MOCKUP_LOGIN_PATH}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
-      const body = await remoteResponse.json().catch(() => ({}));
-      if (!remoteResponse.ok) {
-        json(res, 401, { error: body.error || 'Invalid credentials' });
-        return;
-      }
-      const token =
-        String(body.accessToken || body.token || body.jwt || '').trim() || randomUUID();
-      sessionTokens.set(token, { username, createdAt: new Date().toISOString() });
-      json(res, 200, { token, user: { username }, source: 'mockup' });
-      return;
-    } catch {
-      json(res, 502, { error: 'Mockup login unavailable' });
-      return;
-    }
-  }
-
-  if (username !== DEV_LOGIN_USER || password !== DEV_LOGIN_PASS) {
-    json(res, 401, { error: 'Invalid credentials' });
+  if (!MOCKUP_API_BASE_URL) {
+    json(res, 503, { error: 'Centralized auth is not configured: set MOCKUP_API_BASE_URL' });
     return;
   }
 
-  const token = randomUUID();
-  sessionTokens.set(token, { username, createdAt: new Date().toISOString() });
-  json(res, 200, { token, user: { username }, source: 'local-dev' });
+  try {
+    const remoteResponse = await fetch(`${MOCKUP_API_BASE_URL}${MOCKUP_LOGIN_PATH}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const body = await remoteResponse.json().catch(() => ({}));
+    if (!remoteResponse.ok) {
+      json(res, 401, { error: body.error || 'Invalid credentials' });
+      return;
+    }
+    const token = String(body.accessToken || body.token || body.jwt || '').trim();
+    if (!token) {
+      json(res, 502, { error: 'Mockup login response does not contain a token' });
+      return;
+    }
+    json(res, 200, { token, user: body.user || { username }, source: 'mockup' });
+  } catch {
+    json(res, 502, { error: 'Mockup login unavailable' });
+    return;
+  }
 }
 
 async function handleMockupConfig(req, res) {
-  const fallbackPlatforms = await readAppsFallback();
-  const fallbackPayload = {
-    lines: [],
-    platforms: fallbackPlatforms,
-    languages: ['it', 'en', 'fr', 'es', 'pt'],
-    source: 'fallback'
-  };
-
   if (!MOCKUP_API_BASE_URL) {
-    json(res, 200, fallbackPayload);
+    json(res, 503, { error: 'Centralized config is not configured: set MOCKUP_API_BASE_URL' });
     return;
   }
 
   try {
     const authToken = extractBearerToken(req) || MOCKUP_SERVICE_TOKEN;
+    if (!authToken) {
+      json(res, 401, { error: 'Authorization required for config endpoint' });
+      return;
+    }
     const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
     const remoteResponse = await fetch(`${MOCKUP_API_BASE_URL}${MOCKUP_CONFIG_PATH}`, {
       headers
     });
     const body = await remoteResponse.json().catch(() => ({}));
     if (!remoteResponse.ok) {
-      json(res, 200, fallbackPayload);
+      json(res, remoteResponse.status, { error: body.error || 'Unable to fetch centralized config' });
       return;
     }
 
@@ -459,13 +462,31 @@ async function handleMockupConfig(req, res) {
     const remoteLines = Array.isArray(body.lines) ? body.lines.map((line) => String(line)) : [];
     json(res, 200, {
       lines: remoteLines,
-      platforms: normalizedPlatforms.length ? normalizedPlatforms : fallbackPlatforms,
+      platforms: normalizedPlatforms,
       languages: ['it', 'en', 'fr', 'es', 'pt'],
       source: 'mockup'
     });
   } catch {
-    json(res, 200, fallbackPayload);
+    json(res, 502, { error: 'Unable to reach centralized config service' });
   }
+}
+
+async function handleMockupMe(req, res) {
+  if (!MOCKUP_API_BASE_URL) {
+    json(res, 503, { error: 'Centralized auth is not configured: set MOCKUP_API_BASE_URL' });
+    return;
+  }
+  const token = extractBearerToken(req);
+  if (!token) {
+    json(res, 401, { error: 'Authorization required' });
+    return;
+  }
+  const user = await fetchRemoteUser(token);
+  if (!user) {
+    json(res, 401, { error: 'Invalid or expired token' });
+    return;
+  }
+  json(res, 200, { user, source: 'mockup' });
 }
 
 async function serveFrontend(res, normalizedPath) {
@@ -502,7 +523,7 @@ async function serveFrontend(res, normalizedPath) {
 }
 
 async function handleUpload(req, res) {
-  if (!isAuthorized(req)) {
+  if (!(await isAuthorized(req))) {
     json(res, 401, { error: 'Unauthorized: login required for upload' });
     return;
   }
@@ -616,6 +637,11 @@ async function handleList(req, res) {
 }
 
 async function handleSoftDelete(req, res, id) {
+  if (!(await isAuthorized(req))) {
+    json(res, 401, { error: 'Unauthorized: login required for delete' });
+    return;
+  }
+
   const db = await readDb();
   const index = db.documents.findIndex((doc) => doc.id === id);
   if (index < 0) {
@@ -706,6 +732,101 @@ async function handlePublicLatestPdfByName(req, res, fileSlug) {
   await handlePublicLatestPdf(req, res, platform, docType, lang);
 }
 
+function buildPublicationPrUrl(jobId) {
+  return `https://github.com/CIMAFOUNDATION/cima-legal-public-docs/pull/${jobId.slice(0, 8)}`;
+}
+
+async function runPublicationStub(db, jobId) {
+  const now = new Date().toISOString();
+  const index = db.publicationJobs.findIndex((job) => job.id === jobId);
+  if (index < 0) {
+    return;
+  }
+
+  const current = db.publicationJobs[index];
+  db.publicationJobs[index] = {
+    ...current,
+    status: 'pr_open',
+    prUrl: buildPublicationPrUrl(jobId),
+    updatedAt: now
+  };
+  await writeDb(db);
+}
+
+async function handleCreatePublication(req, res, documentId) {
+  if (!(await isAuthorized(req))) {
+    json(res, 401, { error: 'Unauthorized: login required for publication' });
+    return;
+  }
+
+  const payload = await parseBody(req);
+  const target = String(payload.target || 'public-repo').trim().toLowerCase();
+  const strategy = String(payload.strategy || 'pull-request').trim().toLowerCase();
+  if (target !== 'public-repo') {
+    json(res, 400, { error: 'target must be public-repo' });
+    return;
+  }
+  if (strategy !== 'pull-request') {
+    json(res, 400, { error: 'strategy must be pull-request' });
+    return;
+  }
+
+  const db = await readDb();
+  const document = db.documents.find((doc) => doc.id === documentId && !doc.deletedAt);
+  if (!document) {
+    json(res, 404, { error: 'Document not found' });
+    return;
+  }
+
+  const existing = db.publicationJobs.find((job) => {
+    return (
+      job.documentId === documentId &&
+      ['queued', 'running', 'pr_open'].includes(job.status)
+    );
+  });
+  if (existing) {
+    json(res, 409, {
+      error: 'An active publication job already exists for this document',
+      job: withComputedPublicationFields(existing)
+    });
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const job = {
+    id: randomUUID(),
+    documentId,
+    targetRepo: 'CIMAFOUNDATION/cima-legal-public-docs',
+    targetBranch: `publish/${document.platform}/${document.docType}/${document.lang}/${document.version}`,
+    status: 'queued',
+    strategy: 'pull-request',
+    commitSha: null,
+    prUrl: null,
+    errorMessage: null,
+    createdBy: 'webterms-user',
+    createdAt: now,
+    updatedAt: now
+  };
+
+  db.publicationJobs.push(job);
+  await writeDb(db);
+  await runPublicationStub(db, job.id);
+
+  const updatedDb = await readDb();
+  const persisted = updatedDb.publicationJobs.find((item) => item.id === job.id) || job;
+  json(res, 202, { job: withComputedPublicationFields(persisted) });
+}
+
+async function handleGetPublicationJob(req, res, jobId) {
+  const db = await readDb();
+  const job = db.publicationJobs.find((item) => item.id === jobId);
+  if (!job) {
+    json(res, 404, { error: 'Publication job not found' });
+    return;
+  }
+  json(res, 200, { job: withComputedPublicationFields(job) });
+}
+
 async function requestHandler(req, res) {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, CORS_HEADERS);
@@ -744,6 +865,11 @@ async function requestHandler(req, res) {
       return;
     }
 
+    if (req.method === 'GET' && normalizedPath === '/api/mockup/me') {
+      await handleMockupMe(req, res);
+      return;
+    }
+
     if (req.method === 'GET' && normalizedPath === '/api/documents') {
       await handleList(req, res);
       return;
@@ -758,6 +884,18 @@ async function requestHandler(req, res) {
     const downloadMatch = normalizedPath.match(/^\/api\/documents\/([a-zA-Z0-9-]+)\/download$/);
     if (req.method === 'GET' && downloadMatch) {
       await handleDownload(req, res, downloadMatch[1]);
+      return;
+    }
+
+    const createPublicationMatch = normalizedPath.match(/^\/api\/publications\/([a-zA-Z0-9-]+)$/);
+    if (req.method === 'POST' && createPublicationMatch) {
+      await handleCreatePublication(req, res, createPublicationMatch[1]);
+      return;
+    }
+
+    const publicationJobMatch = normalizedPath.match(/^\/api\/publications\/jobs\/([a-zA-Z0-9-]+)$/);
+    if (req.method === 'GET' && publicationJobMatch) {
+      await handleGetPublicationJob(req, res, publicationJobMatch[1]);
       return;
     }
 

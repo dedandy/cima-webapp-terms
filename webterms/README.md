@@ -35,6 +35,8 @@ Frontend Angular + Bootstrap e API Node minimale per upload/lista documenti lega
 - `GET /api/documents`
 - `DELETE /api/documents/:id`
 - `GET /api/documents/:id/download` (download PDF)
+- `POST /api/publications/:documentId` (crea job pubblicazione verso repo pubblico)
+- `GET /api/publications/jobs/:jobId` (stato job pubblicazione)
 - `GET /api/public/latest.json` (manifest pubblico latest)
 - `GET /api/public/:docType_:platform_:lang.pdf` (URL pubblico stabile latest)
 - `POST /api/mockup/login`
@@ -55,19 +57,17 @@ PDF pubblici (senza autenticazione):
 - Il frontend usa:
   - `POST /api/mockup/login` per autenticarsi
   - `GET /api/mockup/config` per leggere linee/piattaforme/configurazioni
-- Se l'API mockup non e' configurata, il backend usa fallback locale:
-  - piattaforme da `legacy-doc-pipeline/meta/apps.json`
-  - lingue fissate a `it,en,fr,es,pt`
-  - linee vuote
+  - `GET /api/mockup/me` per validare token/sessione
+- Le configurazioni utente e infrastruttura sono centralizzate: senza `MOCKUP_API_BASE_URL`
+  gli endpoint auth/config rispondono con errore (`503`).
 
 Variabili ambiente backend opzionali:
 
 - `WEBTERMS_REQUIRE_LOGIN=true|false` (default `true`)
-- `WEBTERMS_DEV_USER` (default `admin`)
-- `WEBTERMS_DEV_PASS` (default `admin`)
 - `MOCKUP_API_BASE_URL` (es. `https://mockup.cimafoundation.org`)
 - `MOCKUP_LOGIN_PATH` (default `/auth/login`)
 - `MOCKUP_CONFIG_PATH` (default `/config`)
+- `MOCKUP_ME_PATH` (default `/auth/me`)
 - `MOCKUP_SERVICE_TOKEN` (token tecnico per fetch config)
 - `WEBTERMS_CONVERTER_URL` (es. `http://127.0.0.1:3001`, converter Docker)
 

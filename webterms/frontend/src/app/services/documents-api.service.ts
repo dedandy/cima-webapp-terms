@@ -1,29 +1,14 @@
-import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import {
-  DocumentsResponse,
-  InfraConfigResponse,
-  LoginResponse,
-  PublicLatestResponse
-} from './api.models';
+import { DocumentsResponse, PublicLatestResponse } from './api.models';
 import { AuthService } from './auth.service';
 
 @Injectable({ providedIn: 'root' })
-export class ApiService {
+export class DocumentsApiService {
   private readonly http = inject(HttpClient);
   private readonly auth = inject(AuthService);
   private readonly apiBaseUrl = 'api';
-
-  login(username: string, password: string): Observable<LoginResponse> {
-    return this.http.post<LoginResponse>(`${this.apiBaseUrl}/mockup/login`, { username, password });
-  }
-
-  getInfraConfig(): Observable<InfraConfigResponse> {
-    return this.http.get<InfraConfigResponse>(`${this.apiBaseUrl}/mockup/config`, {
-      headers: this.buildAuthHeaders()
-    });
-  }
 
   getDocuments(filters: {
     search?: string;
@@ -43,20 +28,17 @@ export class ApiService {
 
   uploadDocument(payload: Record<string, unknown>): Observable<unknown> {
     return this.http.post(`${this.apiBaseUrl}/documents/upload`, payload, {
-      headers: this.buildAuthHeaders()
+      headers: this.auth.buildAuthHeaders()
     });
   }
 
   softDelete(documentId: string): Observable<unknown> {
-    return this.http.delete(`${this.apiBaseUrl}/documents/${documentId}`);
+    return this.http.delete(`${this.apiBaseUrl}/documents/${documentId}`, {
+      headers: this.auth.buildAuthHeaders()
+    });
   }
 
   getPublicLatest(): Observable<PublicLatestResponse> {
     return this.http.get<PublicLatestResponse>(`${this.apiBaseUrl}/public/latest.json`);
-  }
-
-  private buildAuthHeaders(): HttpHeaders | undefined {
-    const token = this.auth.getToken();
-    return token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
   }
 }

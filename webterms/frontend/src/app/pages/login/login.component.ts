@@ -3,7 +3,7 @@ import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { ApiService } from '../../services/api.service';
+import { AuthApiService } from '../../services/auth-api.service';
 import { AuthService } from '../../services/auth.service';
 
 @Component({
@@ -14,7 +14,7 @@ import { AuthService } from '../../services/auth.service';
   styleUrl: './login.component.scss'
 })
 export class LoginComponent {
-  private readonly api = inject(ApiService);
+  private readonly api = inject(AuthApiService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 

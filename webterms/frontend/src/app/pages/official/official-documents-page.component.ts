@@ -1,8 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { ApiService } from '../../services/api.service';
 import { PublicLatestEntry } from '../../services/api.models';
+import { DocumentsApiService } from '../../services/documents-api.service';
 
 interface OfficialRow {
   line: string;
@@ -22,7 +22,7 @@ interface OfficialRow {
   templateUrl: './official-documents-page.component.html'
 })
 export class OfficialDocumentsPageComponent {
-  private readonly api = inject(ApiService);
+  private readonly documentsApi = inject(DocumentsApiService);
 
   rows: OfficialRow[] = [];
 
@@ -39,7 +39,7 @@ export class OfficialDocumentsPageComponent {
   }
 
   private async load(): Promise<void> {
-    const response = await firstValueFrom(this.api.getPublicLatest());
+    const response = await firstValueFrom(this.documentsApi.getPublicLatest());
     const flattened: OfficialRow[] = [];
     const latest = response.latest || {};
     for (const platform of Object.keys(latest)) {
