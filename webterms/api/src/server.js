@@ -22,6 +22,7 @@ const MOCKUP_CONFIG_PATH = process.env.MOCKUP_CONFIG_PATH || '/config';
 const MOCKUP_ME_PATH = process.env.MOCKUP_ME_PATH || '/auth/me';
 const MOCKUP_SERVICE_TOKEN = process.env.MOCKUP_SERVICE_TOKEN || '';
 const CONVERTER_URL = process.env.WEBTERMS_CONVERTER_URL || '';
+const PUBLISHER_API_URL = process.env.WEBTERMS_PUBLISHER_API_URL || '';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -753,6 +754,37 @@ async function runPublicationStub(db, jobId) {
   await writeDb(db);
 }
 
+async function runPublicationWithPublisherBe(db, job, document) {
+  const pdfPath = path.join(STORAGE_DIR, document.storedFileName);
+  const pdfBuffer = await fs.readFile(pdfPath);
+  const payload = {
+    platform: document.platform,
+    docType: document.docType,
+    lang: document.lang,
+    effectiveDate: document.effectiveDate,
+    version: Number(document.version || 1),
+    fileName:
+      document.downloadFileName ||
+      `${document.platform}_${document.docType}_${document.effectiveDate}_${document.lang}_v${String(document.version || 1).padStart(3, '0')}.pdf`,
+    pdfBase64: pdfBuffer.toString('base64'),
+    sha256: document.sha256,
+    actor: job.createdBy,
+    line: document.line || ''
+  };
+
+  const endpoint = `${PUBLISHER_API_URL.replace(/\/$/, '')}/publish/jobs/${job.id}/run`;
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(body.error || `Publisher BE failed with status ${response.status}`);
+  }
+  return body;
+}
+
 async function handleCreatePublication(req, res, documentId) {
   if (!(await isAuthorized(req))) {
     json(res, 401, { error: 'Unauthorized: login required for publication' });
@@ -810,7 +842,35 @@ async function handleCreatePublication(req, res, documentId) {
 
   db.publicationJobs.push(job);
   await writeDb(db);
-  await runPublicationStub(db, job.id);
+  try {
+    if (PUBLISHER_API_URL) {
+      const runResult = await runPublicationWithPublisherBe(db, job, document);
+      const index = db.publicationJobs.findIndex((item) => item.id === job.id);
+      if (index >= 0) {
+        db.publicationJobs[index] = {
+          ...db.publicationJobs[index],
+          status: 'pr_open',
+          prUrl: String(runResult.prUrl || ''),
+          commitSha: String(runResult.commitSha || ''),
+          updatedAt: new Date().toISOString()
+        };
+        await writeDb(db);
+      }
+    } else {
+      await runPublicationStub(db, job.id);
+    }
+  } catch (error) {
+    const index = db.publicationJobs.findIndex((item) => item.id === job.id);
+    if (index >= 0) {
+      db.publicationJobs[index] = {
+        ...db.publicationJobs[index],
+        status: 'failed',
+        errorMessage: error.message || 'Publication failed',
+        updatedAt: new Date().toISOString()
+      };
+      await writeDb(db);
+    }
+  }
 
   const updatedDb = await readDb();
   const persisted = updatedDb.publicationJobs.find((item) => item.id === job.id) || job;

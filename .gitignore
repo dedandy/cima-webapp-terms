@@ -420,3 +420,4 @@ FodyWeavers.xsd
 .DS_Store
 incoming/*
 !incoming/.gitkeep
+/cima-legal-publisher-be/.idea/

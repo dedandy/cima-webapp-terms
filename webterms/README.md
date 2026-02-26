@@ -70,6 +70,7 @@ Variabili ambiente backend opzionali:
 - `MOCKUP_ME_PATH` (default `/auth/me`)
 - `MOCKUP_SERVICE_TOKEN` (token tecnico per fetch config)
 - `WEBTERMS_CONVERTER_URL` (es. `http://127.0.0.1:3001`, converter Docker)
+- `WEBTERMS_PUBLISHER_API_URL` (es. `http://127.0.0.1:8790`, publisher BE per PR su repo pubblico)
 
 ## Modello dati documento
 
