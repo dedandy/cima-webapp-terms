@@ -1,0 +1,22 @@
+{
+  "documents": [
+    {
+      "filePath": "../../test-docs/documento-1.pdf",
+      "platform": "bricks-dev",
+      "line": "",
+      "docType": "terms",
+      "lang": "it",
+      "effectiveDate": "2026-02-20",
+      "publish": true
+    },
+    {
+      "filePath": "../../test-docs/documento-2.docx",
+      "platform": "bricks-dev",
+      "line": "",
+      "docType": "privacy",
+      "lang": "it",
+      "effectiveDate": "2026-02-20",
+      "publish": false
+    }
+  ]
+}
