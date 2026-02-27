@@ -16,9 +16,12 @@ const FRONTEND_DIST_DIR = path.resolve(ROOT_DIR, '..', 'frontend', 'dist', 'fron
 
 const PORT = Number(process.env.PORT || 8787);
 const REQUIRE_LOGIN = process.env.WEBTERMS_REQUIRE_LOGIN !== 'false';
+const ALLOW_LOCAL_AUTH_FALLBACK = process.env.WEBTERMS_LOCAL_AUTH_FALLBACK !== 'false';
+const DEV_LOGIN_USER = process.env.WEBTERMS_DEV_USER || 'dev';
+const DEV_LOGIN_PASS = process.env.WEBTERMS_DEV_PASS || 'dev4portal';
 const MOCKUP_API_BASE_URL = process.env.MOCKUP_API_BASE_URL || '';
 const MOCKUP_LOGIN_PATH = process.env.MOCKUP_LOGIN_PATH || '/auth/login';
-const MOCKUP_CONFIG_PATH = process.env.MOCKUP_CONFIG_PATH || '/config';
+const MOCKUP_CONFIG_PATH = process.env.MOCKUP_CONFIG_PATH || '/infrastruttura/api';
 const MOCKUP_ME_PATH = process.env.MOCKUP_ME_PATH || '/auth/me';
 const MOCKUP_SERVICE_TOKEN = process.env.MOCKUP_SERVICE_TOKEN || '';
 const CONVERTER_URL = process.env.WEBTERMS_CONVERTER_URL || '';
@@ -32,6 +35,7 @@ const CORS_HEADERS = {
 
 const DOC_TYPES = new Set(['terms', 'privacy', 'cookie']);
 const execFileAsync = promisify(execFile);
+const localSessionTokens = new Map();
 
 async function detectConverterHealth() {
   if (CONVERTER_URL) {
@@ -273,6 +277,30 @@ function buildPublicLatest(documents) {
   return latest;
 }
 
+async function buildLocalInfraConfig() {
+  const db = await readDb();
+  const platforms = Array.from(
+    new Set(
+      db.documents
+        .map((doc) => String(doc.platform || '').trim())
+        .filter(Boolean)
+    )
+  ).map((id) => ({ id, label: id }));
+  const lines = Array.from(
+    new Set(
+      db.documents
+        .map((doc) => String(doc.line || '').trim())
+        .filter(Boolean)
+    )
+  );
+  return {
+    lines,
+    platforms,
+    languages: ['it', 'en', 'fr', 'es', 'pt'],
+    source: 'local-fallback'
+  };
+}
+
 async function resolvePdfForDocument(db, document) {
   const filePath = path.join(STORAGE_DIR, document.storedFileName);
   const rawBuffer = await fs.readFile(filePath);
@@ -361,19 +389,60 @@ function extractBearerToken(req) {
   return header.slice(7).trim();
 }
 
+function collectLinesFromPlatforms(items) {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+  const out = new Set();
+  for (const item of items) {
+    if (!item || typeof item !== 'object') {
+      continue;
+    }
+    const directLine = String(item.line || item.linea || '').trim();
+    if (directLine) {
+      out.add(directLine);
+    }
+    const lineArray = Array.isArray(item.lines)
+      ? item.lines
+      : Array.isArray(item.linee)
+        ? item.linee
+        : [];
+    for (const line of lineArray) {
+      const normalized = String(line || '').trim();
+      if (normalized) {
+        out.add(normalized);
+      }
+    }
+  }
+  return Array.from(out);
+}
+
 async function fetchRemoteUser(token) {
+  const localSession = localSessionTokens.get(token);
+  if (localSession) {
+    return localSession;
+  }
+  if (ALLOW_LOCAL_AUTH_FALLBACK && token.startsWith('local-dev-')) {
+    return { username: 'dev', source: 'local-dev' };
+  }
   if (!MOCKUP_API_BASE_URL || !token) {
     return null;
   }
   try {
-    const response = await fetch(`${MOCKUP_API_BASE_URL}${MOCKUP_ME_PATH}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (!response.ok) {
-      return null;
+    const candidatePaths = Array.from(
+      new Set([MOCKUP_ME_PATH, '/auth/me', '/me', '/infrastruttura/api/auth/me'])
+    );
+    for (const candidatePath of candidatePaths) {
+      const response = await fetch(`${MOCKUP_API_BASE_URL}${candidatePath}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) {
+        continue;
+      }
+      const body = await response.json().catch(() => ({}));
+      return body?.user || body || null;
     }
-    const body = await response.json().catch(() => ({}));
-    return body?.user || body || null;
+    return null;
   } catch {
     return null;
   }
@@ -398,57 +467,80 @@ async function handleMockupLogin(req, res) {
     return;
   }
 
-  if (!MOCKUP_API_BASE_URL) {
-    json(res, 503, { error: 'Centralized auth is not configured: set MOCKUP_API_BASE_URL' });
+  if (MOCKUP_API_BASE_URL) {
+    try {
+      const candidatePaths = Array.from(
+        new Set([MOCKUP_LOGIN_PATH, '/auth/login', '/login', '/infrastruttura/api/auth/login'])
+      );
+      for (const candidatePath of candidatePaths) {
+        const remoteResponse = await fetch(`${MOCKUP_API_BASE_URL}${candidatePath}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        if (!remoteResponse.ok) {
+          continue;
+        }
+        const body = await remoteResponse.json().catch(() => ({}));
+        const token = String(body.accessToken || body.token || body.jwt || '').trim();
+        if (token) {
+          json(res, 200, { token, user: body.user || { username }, source: 'mockup' });
+          return;
+        }
+      }
+    } catch {
+      // fallback below when enabled
+    }
+  }
+
+  if (ALLOW_LOCAL_AUTH_FALLBACK) {
+    if (username !== DEV_LOGIN_USER || password !== DEV_LOGIN_PASS) {
+      json(res, 401, { error: 'Invalid credentials' });
+      return;
+    }
+    const token = `local-dev-${randomUUID()}`;
+    localSessionTokens.set(token, { username, source: 'local-dev' });
+    json(res, 200, { token, user: { username }, source: 'local-dev' });
     return;
   }
 
-  try {
-    const remoteResponse = await fetch(`${MOCKUP_API_BASE_URL}${MOCKUP_LOGIN_PATH}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    });
-    const body = await remoteResponse.json().catch(() => ({}));
-    if (!remoteResponse.ok) {
-      json(res, 401, { error: body.error || 'Invalid credentials' });
-      return;
-    }
-    const token = String(body.accessToken || body.token || body.jwt || '').trim();
-    if (!token) {
-      json(res, 502, { error: 'Mockup login response does not contain a token' });
-      return;
-    }
-    json(res, 200, { token, user: body.user || { username }, source: 'mockup' });
-  } catch {
-    json(res, 502, { error: 'Mockup login unavailable' });
-    return;
-  }
+  json(res, 503, { error: 'Mockup login unavailable and local fallback disabled' });
 }
 
 async function handleMockupConfig(req, res) {
   if (!MOCKUP_API_BASE_URL) {
-    json(res, 503, { error: 'Centralized config is not configured: set MOCKUP_API_BASE_URL' });
+    json(res, 200, await buildLocalInfraConfig());
     return;
   }
 
   try {
     const authToken = extractBearerToken(req) || MOCKUP_SERVICE_TOKEN;
-    if (!authToken) {
-      json(res, 401, { error: 'Authorization required for config endpoint' });
-      return;
-    }
     const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
-    const remoteResponse = await fetch(`${MOCKUP_API_BASE_URL}${MOCKUP_CONFIG_PATH}`, {
-      headers
-    });
-    const body = await remoteResponse.json().catch(() => ({}));
-    if (!remoteResponse.ok) {
-      json(res, remoteResponse.status, { error: body.error || 'Unable to fetch centralized config' });
+    const candidatePaths = Array.from(new Set([MOCKUP_CONFIG_PATH, '/infrastruttura/api', '/config']));
+    let body = null;
+    let lastStatus = 502;
+    for (const candidatePath of candidatePaths) {
+      const remoteResponse = await fetch(`${MOCKUP_API_BASE_URL}${candidatePath}`, { headers });
+      lastStatus = remoteResponse.status;
+      if (!remoteResponse.ok) {
+        continue;
+      }
+      body = await remoteResponse.json().catch(() => ({}));
+      break;
+    }
+    if (!body) {
+      json(res, 200, await buildLocalInfraConfig());
       return;
     }
 
-    const remotePlatforms = Array.isArray(body.platforms) ? body.platforms : [];
+    const sourceBody = body?.data && typeof body.data === 'object' ? body.data : body;
+    const remotePlatforms = Array.isArray(sourceBody.platforms)
+      ? sourceBody.platforms
+      : Array.isArray(sourceBody.infrastructures)
+        ? sourceBody.infrastructures
+        : Array.isArray(sourceBody.apps)
+          ? sourceBody.apps
+          : [];
     const normalizedPlatforms = remotePlatforms
       .map((item) => {
         if (typeof item === 'string') {
@@ -460,7 +552,14 @@ async function handleMockupConfig(req, res) {
       })
       .filter(Boolean);
 
-    const remoteLines = Array.isArray(body.lines) ? body.lines.map((line) => String(line)) : [];
+    const remoteLinesRaw = Array.isArray(sourceBody.lines)
+      ? sourceBody.lines
+      : Array.isArray(sourceBody.linee)
+        ? sourceBody.linee
+        : collectLinesFromPlatforms(remotePlatforms);
+    const remoteLines = Array.from(
+      new Set(remoteLinesRaw.map((line) => String(line || '').trim()).filter(Boolean))
+    );
     json(res, 200, {
       lines: remoteLines,
       platforms: normalizedPlatforms,
@@ -468,15 +567,11 @@ async function handleMockupConfig(req, res) {
       source: 'mockup'
     });
   } catch {
-    json(res, 502, { error: 'Unable to reach centralized config service' });
+    json(res, 200, await buildLocalInfraConfig());
   }
 }
 
 async function handleMockupMe(req, res) {
-  if (!MOCKUP_API_BASE_URL) {
-    json(res, 503, { error: 'Centralized auth is not configured: set MOCKUP_API_BASE_URL' });
-    return;
-  }
   const token = extractBearerToken(req);
   if (!token) {
     json(res, 401, { error: 'Authorization required' });

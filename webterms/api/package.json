@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "batch:import": "node scripts/batch-import-and-publish.mjs"
   }
 }

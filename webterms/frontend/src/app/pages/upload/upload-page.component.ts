@@ -24,7 +24,7 @@ export class UploadPageComponent {
 
   readonly uploadForm = this.fb.group({
     platform: ['', Validators.required],
-    line: [''],
+    line: this.fb.control({ value: '', disabled: true }),
     docType: ['terms', Validators.required],
     lang: ['it', Validators.required],
     effectiveDate: ['', Validators.required]
@@ -101,7 +101,14 @@ export class UploadPageComponent {
           return;
         }
         const duplicateId = error?.error?.duplicateDocumentId;
-        results.push(duplicateId ? `DUP: ${file.name} (id ${duplicateId})` : `ERR: ${file.name}`);
+        const backendError = String(error?.error?.error || '').trim();
+        if (duplicateId) {
+          results.push(`DUP: ${file.name} (id ${duplicateId})`);
+        } else if (backendError) {
+          results.push(`ERR: ${file.name} (${backendError})`);
+        } else {
+          results.push(`ERR: ${file.name} (status ${error?.status || 'unknown'})`);
+        }
       }
     }
 
@@ -115,11 +122,18 @@ export class UploadPageComponent {
       const cfg = await firstValueFrom(this.configApi.getInfraConfig());
       this.platformOptions = cfg.platforms || [];
       this.lineOptions = cfg.lines || [];
+      if (this.lineOptions.length) {
+        this.uploadForm.controls.line.enable({ emitEvent: false });
+      } else {
+        this.uploadForm.controls.line.disable({ emitEvent: false });
+      }
       this.langOptions = cfg.languages?.length ? cfg.languages : this.langOptions;
       const firstPlatform = this.platformOptions[0]?.id || '';
       this.uploadForm.patchValue({ platform: firstPlatform });
     } catch {
       this.platformOptions = [];
+      this.lineOptions = [];
+      this.uploadForm.controls.line.disable({ emitEvent: false });
       this.uploadForm.patchValue({ platform: '' });
     }
   }

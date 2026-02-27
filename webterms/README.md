@@ -42,6 +42,23 @@ Frontend Angular + Bootstrap e API Node minimale per upload/lista documenti lega
 - `POST /api/mockup/login`
 - `GET /api/mockup/config`
 
+## Import massivo documenti + pubblicazione
+
+Per popolare il DB e creare i job verso GitHub in batch:
+
+1. Prepara un manifest JSON basato su `webterms/api/scripts/import-manifest.example.json`.
+2. Avvia API (`webterms/api`) e usa:
+
+```bash
+cd webterms/api
+npm run batch:import -- --manifest ./scripts/import-manifest.example.json --api-base http://127.0.0.1:8787 --token <BEARER_TOKEN>
+```
+
+Opzioni utili:
+
+- `--dry-run` valida il manifest senza caricare file.
+- `--only-publish` non carica file, crea job di pubblicazione cercando i documenti già presenti nel DB (oppure usa `documentId` nel manifest).
+
 Compatibile anche con prefisso path pubblicazione:
 
 - `/webterms/api/...`
@@ -64,6 +81,9 @@ PDF pubblici (senza autenticazione):
 Variabili ambiente backend opzionali:
 
 - `WEBTERMS_REQUIRE_LOGIN=true|false` (default `true`)
+- `WEBTERMS_LOCAL_AUTH_FALLBACK=true|false` (default `true`, usa credenziali locali se mockup non disponibile)
+- `WEBTERMS_DEV_USER` (default `dev`, usato con fallback locale)
+- `WEBTERMS_DEV_PASS` (default `dev4portal`, usato con fallback locale)
 - `MOCKUP_API_BASE_URL` (es. `https://mockup.cimafoundation.org`)
 - `MOCKUP_LOGIN_PATH` (default `/auth/login`)
 - `MOCKUP_CONFIG_PATH` (default `/config`)

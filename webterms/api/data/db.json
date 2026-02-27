@@ -88,6 +88,28 @@
       "createdAt": "2026-02-25T18:05:08.424Z",
       "updatedAt": "2026-02-25T18:05:08.424Z",
       "deletedAt": null
+    },
+    {
+      "id": "dd968469-5bd2-4a9a-8431-17d8a5e99f6e",
+      "originalFileName": "documento-1.pdf",
+      "downloadFileName": "terms_bricks-dev_it.pdf",
+      "storedFileName": "dd968469-5bd2-4a9a-8431-17d8a5e99f6e_terms_bricks-dev_it.pdf",
+      "originalMimeType": "application/pdf",
+      "sourceSha256": "32f0f838d02575d843095da958ec47c1784516dbfc3d2607557355b908b64fbd",
+      "mimeType": "application/pdf",
+      "sizeBytes": 18106,
+      "sha256": "32f0f838d02575d843095da958ec47c1784516dbfc3d2607557355b908b64fbd",
+      "platform": "bricks-dev",
+      "line": "",
+      "docType": "terms",
+      "lang": "it",
+      "effectiveDate": "2026-02-26",
+      "version": 1,
+      "convertedToPdf": false,
+      "createdAt": "2026-02-26T19:05:22.735Z",
+      "updatedAt": "2026-02-26T19:05:22.735Z",
+      "deletedAt": null
     }
-  ]
+  ],
+  "publicationJobs": []
 }
