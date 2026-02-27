@@ -3,6 +3,7 @@ import { Component, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { PublicLatestEntry } from '../../services/api.models';
 import { DocumentsApiService } from '../../services/documents-api.service';
+import { RuntimeConfigService } from '../../services/runtime-config.service';
 
 interface OfficialRow {
   line: string;
@@ -23,6 +24,7 @@ interface OfficialRow {
 })
 export class OfficialDocumentsPageComponent {
   private readonly documentsApi = inject(DocumentsApiService);
+  private readonly runtimeConfig = inject(RuntimeConfigService);
 
   rows: OfficialRow[] = [];
 
@@ -39,7 +41,9 @@ export class OfficialDocumentsPageComponent {
   }
 
   private async load(): Promise<void> {
-    const response = await firstValueFrom(this.documentsApi.getPublicLatest());
+    const response = await firstValueFrom(
+      this.documentsApi.getPublicLatest(this.runtimeConfig.getManifestUrl())
+    );
     const flattened: OfficialRow[] = [];
     const latest = response.latest || {};
     for (const platform of Object.keys(latest)) {

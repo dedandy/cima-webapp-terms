@@ -1,8 +1,14 @@
 # CIMA Legal Docs Repository
 
 ## Repository Layout
-- `legacy-doc-pipeline/`: ingest + processing pipeline storica (scripts, assets, latest index, pages site).
-- `webterms/`: nuova webapp Angular + API per upload/lista documenti.
+- `webterms/`: webapp Angular attiva per list/upload/publish diretto su GitHub pubblico.
+- `legacy-doc-pipeline/`: pipeline storica mantenuta per riferimento/migrazioni.
+- `docs/public-repo-publication-blueprint.md`: architettura corrente e flusso operativo.
+
+## Current Status
+- Pubblicazione attiva: FE `webterms` -> GitHub Contents API -> `dedandy/cima-legal-public-docs`.
+- Manifest letto dalle webapp: `legal-docs/manifests/latest.json` nel repo pubblico.
+- `cima-legal-publisher-be` non e' piu' necessario nel flusso runtime.
 
 ## IT
 Repository per gestire sorgenti WYSIWYG, metadati e asset PDF dei documenti legali (terms/privacy/cookie) per piattaforma e lingua.

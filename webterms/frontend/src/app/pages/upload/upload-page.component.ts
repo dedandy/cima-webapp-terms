@@ -7,6 +7,7 @@ import { PlatformOption } from '../../services/api.models';
 import { AuthService } from '../../services/auth.service';
 import { ConfigApiService } from '../../services/config-api.service';
 import { DocumentsApiService } from '../../services/documents-api.service';
+import { RuntimeConfigService } from '../../services/runtime-config.service';
 
 @Component({
   selector: 'app-upload-page',
@@ -21,13 +22,25 @@ export class UploadPageComponent {
   private readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
+  private readonly runtimeConfig = inject(RuntimeConfigService);
 
   readonly uploadForm = this.fb.group({
     platform: ['', Validators.required],
     line: this.fb.control({ value: '', disabled: true }),
-    docType: ['terms', Validators.required],
+    docType: this.fb.control<'terms' | 'privacy' | 'cookie'>('terms', Validators.required),
     lang: ['it', Validators.required],
     effectiveDate: ['', Validators.required]
+  });
+
+  readonly githubForm = this.fb.group({
+    manifestUrl: [this.runtimeConfig.getManifestUrl(), Validators.required],
+    githubToken: [this.runtimeConfig.getGithubToken(), Validators.required],
+    repoOwner: [this.runtimeConfig.getGithubRepoConfig().owner, Validators.required],
+    repoName: [this.runtimeConfig.getGithubRepoConfig().repo, Validators.required],
+    branch: [this.runtimeConfig.getGithubRepoConfig().branch, Validators.required],
+    documentsRootPath: [this.runtimeConfig.getGithubRepoConfig().documentsRootPath, Validators.required],
+    manifestPath: [this.runtimeConfig.getGithubRepoConfig().manifestPath, Validators.required],
+    publicBaseUrl: [this.runtimeConfig.getGithubRepoConfig().publicBaseUrl, Validators.required]
   });
 
   queuedFiles: File[] = [];
@@ -68,43 +81,60 @@ export class UploadPageComponent {
     this.dragActive = false;
   }
 
+  saveGithubSettings(): void {
+    const cfg = this.githubForm.getRawValue();
+    this.runtimeConfig.setManifestUrl(String(cfg.manifestUrl || ''));
+    this.runtimeConfig.setGithubToken(String(cfg.githubToken || ''));
+    this.runtimeConfig.setGithubRepoConfig({
+      owner: String(cfg.repoOwner || ''),
+      repo: String(cfg.repoName || ''),
+      branch: String(cfg.branch || ''),
+      documentsRootPath: String(cfg.documentsRootPath || ''),
+      manifestPath: String(cfg.manifestPath || ''),
+      publicBaseUrl: String(cfg.publicBaseUrl || '')
+    });
+    this.uploadMessage = 'Configurazione GitHub salvata.';
+  }
+
   removeQueued(index: number): void {
     this.queuedFiles = this.queuedFiles.filter((_, idx) => idx !== index);
   }
 
   async uploadAll(): Promise<void> {
-    if (!this.queuedFiles.length || this.uploadForm.invalid) {
+    if (!this.queuedFiles.length || this.uploadForm.invalid || this.githubForm.invalid) {
       this.uploadMessage = 'Compila i campi e aggiungi almeno un file.';
       return;
     }
 
+    this.saveGithubSettings();
     this.loading = true;
     const formValue = this.uploadForm.getRawValue();
+    const github = this.githubForm.getRawValue();
     const results: string[] = [];
 
     for (const file of this.queuedFiles) {
       try {
         const payload = {
-          ...formValue,
+          platform: String(formValue.platform || ''),
+          line: String(formValue.line || ''),
+          docType: formValue.docType || 'terms',
+          lang: String(formValue.lang || 'it'),
+          effectiveDate: String(formValue.effectiveDate || ''),
           fileName: file.name,
-          mimeType: file.type || 'application/octet-stream',
-          contentBase64: await this.readFileAsBase64(file)
+          contentBase64: await this.readFileAsBase64(file),
+          githubToken: String(github.githubToken || ''),
+          repoOwner: String(github.repoOwner || ''),
+          repoName: String(github.repoName || ''),
+          branch: String(github.branch || ''),
+          documentsRootPath: String(github.documentsRootPath || ''),
+          manifestPath: String(github.manifestPath || ''),
+          publicBaseUrl: String(github.publicBaseUrl || '')
         };
-        await firstValueFrom(this.documentsApi.uploadDocument(payload));
-        results.push(`OK: ${file.name}`);
+        const published = await this.documentsApi.publishDocument(payload);
+        results.push(`OK: ${file.name} (v${String(published.version).padStart(3, '0')})`);
       } catch (error: any) {
-        if (error?.status === 401) {
-          this.auth.clearToken();
-          this.uploadMessage = 'Sessione scaduta o non valida. Effettua di nuovo il login.';
-          this.router.navigate(['/login']);
-          this.loading = false;
-          return;
-        }
-        const duplicateId = error?.error?.duplicateDocumentId;
-        const backendError = String(error?.error?.error || '').trim();
-        if (duplicateId) {
-          results.push(`DUP: ${file.name} (id ${duplicateId})`);
-        } else if (backendError) {
+        const backendError = String(error?.error?.message || error?.error || '').trim();
+        if (backendError) {
           results.push(`ERR: ${file.name} (${backendError})`);
         } else {
           results.push(`ERR: ${file.name} (status ${error?.status || 'unknown'})`);

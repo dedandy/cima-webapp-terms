@@ -7,49 +7,46 @@
         <th>Data</th>
         <th>Version</th>
         <th>Hash</th>
-        <th>Stato</th>
         <th>Download</th>
-        <th></th>
+        @if (canDelete) {
+          <th></th>
+        }
       </tr>
     </thead>
     <tbody>
-    @if (!documents.length) {
-      <tr >
-        <td colspan="8" class="text-secondary">Nessun documento.</td>
-      </tr>
-    }
-    @for (doc of documents; track trackById($index, doc)) {
-      <tr >
-        <td>
-          <div class="fw-semibold">{{ doc.downloadFileName || doc.originalFileName }}</div>
-          <div class="small text-secondary">{{ doc.originalFileName }}</div>
-        </td>
-        <td>{{ doc.platform }} / {{ doc.docType }} / {{ doc.lang }}</td>
-        <td>{{ doc.effectiveDate }}</td>
-        <td>v{{ String(doc.version).padStart(3, '0') }}</td>
-        <td><code>{{ doc.sha256.slice(0, 10) }}...</code></td>
-        <td>
-          @if (doc.deletedAt) {
-          <span class="badge text-bg-danger" *ngIf="doc.deletedAt">eliminato</span>
-          } @else {
-           <span class="badge text-bg-success">attivo</span>
+      @if (!documents.length) {
+        <tr>
+          <td [attr.colspan]="canDelete ? 7 : 6" class="text-secondary">Nessun documento.</td>
+        </tr>
+      }
+      @for (doc of documents; track trackById($index, doc)) {
+        <tr>
+          <td>
+            <div class="fw-semibold">{{ doc.downloadFileName || doc.originalFileName }}</div>
+            <div class="small text-secondary">{{ doc.originalFileName }}</div>
+          </td>
+          <td>{{ doc.platform }} / {{ doc.docType }} / {{ doc.lang }}</td>
+          <td>{{ doc.effectiveDate }}</td>
+          <td>v{{ String(doc.version).padStart(3, '0') }}</td>
+          <td><code>{{ doc.sha256.slice(0, 10) }}...</code></td>
+          <td>
+            <a class="btn btn-sm btn-outline-primary" [href]="doc.downloadUrl" target="_blank" rel="noopener">
+              Scarica
+            </a>
+          </td>
+          @if (canDelete) {
+            <td>
+              <button
+                class="btn btn-sm btn-outline-danger"
+                [disabled]="!!doc.deletedAt"
+                (click)="deleteRequested.emit(doc.id)"
+              >
+                Soft delete
+              </button>
+            </td>
           }
-        </td>
-        <td>
-          <a class="btn btn-sm btn-outline-primary" [href]="'api/documents/' + doc.id + '/download'">Scarica</a>
-        </td>
-        <td>
-          <button
-            class="btn btn-sm btn-outline-danger"
-            [disabled]="!canDelete || !!doc.deletedAt"
-            (click)="deleteRequested.emit(doc.id)"
-          >
-            Soft delete
-          </button>
-        </td>
-      </tr>
-    }
-
+        </tr>
+      }
     </tbody>
   </table>
 </div>

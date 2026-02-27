@@ -1,6 +1,6 @@
 export interface DocumentDto {
   id: string;
-  downloadFileName?: string;
+  downloadFileName: string;
   originalFileName: string;
   line?: string;
   sha256: string;
@@ -10,6 +10,8 @@ export interface DocumentDto {
   effectiveDate: string;
   version: number;
   deletedAt: string | null;
+  downloadUrl: string;
+  publicUrl: string;
 }
 
 export interface DocumentsResponse {
@@ -40,14 +42,33 @@ export interface MeResponse {
 
 export interface PublicLatestEntry {
   id: string;
-  line: string;
+  line?: string;
   version: number;
   effectiveDate: string;
   sha256: string;
   url: string;
   downloadUrl: string;
+  originalFileName?: string;
+  downloadFileName?: string;
 }
 
 export interface PublicLatestResponse {
   latest: Record<string, Record<string, Record<string, PublicLatestEntry>>>;
+}
+
+export interface PublishPayload {
+  platform: string;
+  line?: string;
+  docType: 'terms' | 'privacy' | 'cookie';
+  lang: string;
+  effectiveDate: string;
+  fileName: string;
+  contentBase64: string;
+  githubToken: string;
+  repoOwner: string;
+  repoName: string;
+  branch: string;
+  documentsRootPath: string;
+  manifestPath: string;
+  publicBaseUrl: string;
 }

@@ -4,9 +4,9 @@ import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { DocumentsListComponent } from '../../components/documents-list/documents-list.component';
 import { DocumentDto, PlatformOption } from '../../services/api.models';
-import { AuthService } from '../../services/auth.service';
 import { ConfigApiService } from '../../services/config-api.service';
 import { DocumentsApiService } from '../../services/documents-api.service';
+import { RuntimeConfigService } from '../../services/runtime-config.service';
 
 @Component({
   selector: 'app-documents-page',
@@ -17,15 +17,14 @@ import { DocumentsApiService } from '../../services/documents-api.service';
 export class DocumentsPageComponent {
   private readonly configApi = inject(ConfigApiService);
   private readonly documentsApi = inject(DocumentsApiService);
-  private readonly auth = inject(AuthService);
+  private readonly runtimeConfig = inject(RuntimeConfigService);
   private readonly fb = inject(FormBuilder);
 
   readonly filterForm = this.fb.group({
     search: [''],
     platform: [''],
     docType: [''],
-    lang: [''],
-    includeDeleted: [false]
+    lang: ['']
   });
 
   documents: DocumentDto[] = [];
@@ -36,18 +35,6 @@ export class DocumentsPageComponent {
     this.loadConfig();
     this.loadDocuments();
     this.filterForm.valueChanges.subscribe(() => this.loadDocuments());
-  }
-
-  async onDelete(documentId: string): Promise<void> {
-    if (!this.auth.isAuthenticated()) {
-      return;
-    }
-    await firstValueFrom(this.documentsApi.softDelete(documentId));
-    await this.loadDocuments();
-  }
-
-  isAuthenticated(): boolean {
-    return this.auth.isAuthenticated();
   }
 
   private async loadConfig(): Promise<void> {
@@ -63,12 +50,11 @@ export class DocumentsPageComponent {
   private async loadDocuments(): Promise<void> {
     const formValue = this.filterForm.getRawValue();
     const response = await firstValueFrom(
-      this.documentsApi.getDocuments({
+      this.documentsApi.getDocuments(this.runtimeConfig.getManifestUrl(), {
         search: formValue.search || undefined,
         platform: formValue.platform || undefined,
         docType: formValue.docType || undefined,
-        lang: formValue.lang || undefined,
-        includeDeleted: Boolean(formValue.includeDeleted)
+        lang: formValue.lang || undefined
       })
     );
     this.documents = response.documents || [];
