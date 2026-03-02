@@ -30,7 +30,7 @@ export class LoginComponent {
         this.showError();
         return;
       }
-      this.auth.setToken(response.token);
+      this.auth.setSession(response.token, response.user);
       this.router.navigate(['/upload']);
     } catch {
       this.showError();

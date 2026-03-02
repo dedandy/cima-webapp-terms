@@ -7,7 +7,8 @@
     <a routerLink="/documents" class="btn btn-outline-secondary btn-sm">Vai alla pagina pubblica</a>
   </header>
 
-  <section class="card border-0 shadow-sm mb-4">
+  @if (canViewGithubConfig) {
+    <section class="card border-0 shadow-sm mb-4">
     <div class="card-body">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <h2 class="h5 mb-0">Configurazione GitHub</h2>
@@ -16,48 +17,53 @@
         </button>
       </div>
       @if (showGithubConfig) {
-        <form [formGroup]="githubForm" class="row g-3">
-          <div class="col-12 col-lg-6">
-            <label class="form-label">Manifest URL pubblico</label>
-            <input class="form-control" [class.is-invalid]="hasGithubError('manifestUrl')" formControlName="manifestUrl" />
+        <fieldset [disabled]="!canEditGithubConfig">
+          <form [formGroup]="githubForm" class="row g-3">
+            <div class="col-12 col-lg-6">
+              <label class="form-label">Manifest URL pubblico</label>
+              <input class="form-control" [class.is-invalid]="hasGithubError('manifestUrl')" formControlName="manifestUrl" />
+            </div>
+            <div class="col-12 col-lg-6">
+              <label class="form-label">GitHub token (repo write)</label>
+              <input class="form-control" [class.is-invalid]="hasGithubError('githubToken')" type="password" formControlName="githubToken" />
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">Repo owner</label>
+              <input class="form-control" [class.is-invalid]="hasGithubError('repoOwner')" formControlName="repoOwner" />
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">Repo name</label>
+              <input class="form-control" [class.is-invalid]="hasGithubError('repoName')" formControlName="repoName" />
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">Branch</label>
+              <input class="form-control" [class.is-invalid]="hasGithubError('branch')" formControlName="branch" />
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">Documents root path</label>
+              <input class="form-control" [class.is-invalid]="hasGithubError('documentsRootPath')" formControlName="documentsRootPath" />
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">Manifest path</label>
+              <input class="form-control" [class.is-invalid]="hasGithubError('manifestPath')" formControlName="manifestPath" />
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">Public base URL</label>
+              <input class="form-control" [class.is-invalid]="hasGithubError('publicBaseUrl')" formControlName="publicBaseUrl" />
+            </div>
+          </form>
+        </fieldset>
+        @if (canEditGithubConfig) {
+          <div class="mt-3">
+            <button class="btn btn-outline-secondary btn-sm" type="button" (click)="saveGithubSettings()">
+              Salva configurazione
+            </button>
           </div>
-          <div class="col-12 col-lg-6">
-            <label class="form-label">GitHub token (repo write)</label>
-            <input class="form-control" [class.is-invalid]="hasGithubError('githubToken')" type="password" formControlName="githubToken" />
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label">Repo owner</label>
-            <input class="form-control" [class.is-invalid]="hasGithubError('repoOwner')" formControlName="repoOwner" />
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label">Repo name</label>
-            <input class="form-control" [class.is-invalid]="hasGithubError('repoName')" formControlName="repoName" />
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label">Branch</label>
-            <input class="form-control" [class.is-invalid]="hasGithubError('branch')" formControlName="branch" />
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label">Documents root path</label>
-            <input class="form-control" [class.is-invalid]="hasGithubError('documentsRootPath')" formControlName="documentsRootPath" />
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label">Manifest path</label>
-            <input class="form-control" [class.is-invalid]="hasGithubError('manifestPath')" formControlName="manifestPath" />
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label">Public base URL</label>
-            <input class="form-control" [class.is-invalid]="hasGithubError('publicBaseUrl')" formControlName="publicBaseUrl" />
-          </div>
-        </form>
-        <div class="mt-3">
-          <button class="btn btn-outline-secondary btn-sm" type="button" (click)="saveGithubSettings()">
-            Salva configurazione
-          </button>
-        </div>
+        }
       }
     </div>
-  </section>
+    </section>
+  }
 
   <section class="card border-0 shadow-sm mb-4">
     <div class="card-body">

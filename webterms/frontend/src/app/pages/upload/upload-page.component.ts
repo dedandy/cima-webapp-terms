@@ -82,6 +82,7 @@ export class UploadPageComponent {
   }
 
   saveGithubSettings(): void {
+    if (!this.canEditGithubConfig) return;
     const cfg = this.githubForm.getRawValue();
     this.runtimeConfig.setManifestUrl(String(cfg.manifestUrl || ''));
     this.runtimeConfig.setGithubToken(String(cfg.githubToken || ''));
@@ -97,6 +98,7 @@ export class UploadPageComponent {
   }
 
   toggleGithubConfig(): void {
+    if (!this.canViewGithubConfig) return;
     this.showGithubConfig = !this.showGithubConfig;
   }
 
@@ -201,5 +203,13 @@ export class UploadPageComponent {
 
   get filesMissing(): boolean {
     return this.submitAttempted && this.queuedFiles.length === 0;
+  }
+
+  get canViewGithubConfig(): boolean {
+    return this.auth.canViewConfiguration();
+  }
+
+  get canEditGithubConfig(): boolean {
+    return this.auth.canEditConfiguration();
   }
 }
