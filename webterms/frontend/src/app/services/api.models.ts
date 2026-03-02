@@ -32,7 +32,7 @@ export interface InfraConfigResponse {
 
 export interface LoginResponse {
   token: string;
-  user?: { username: string };
+  user?: { id?: number; username: string; role?: string };
   source?: string;
 }
 

@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators, AbstractControl } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { PlatformOption } from '../../services/api.models';
@@ -26,7 +26,6 @@ export class UploadPageComponent {
 
   readonly uploadForm = this.fb.group({
     platform: ['', Validators.required],
-    line: this.fb.control({ value: '', disabled: true }),
     docType: this.fb.control<'terms' | 'privacy' | 'cookie'>('terms', Validators.required),
     lang: ['it', Validators.required],
     effectiveDate: ['', Validators.required]
@@ -47,8 +46,9 @@ export class UploadPageComponent {
   uploadMessage = '';
   loading = false;
   dragActive = false;
+  showGithubConfig = false;
+  submitAttempted = false;
   platformOptions: PlatformOption[] = [];
-  lineOptions: string[] = [];
   langOptions = ['it', 'en', 'fr', 'es', 'pt'];
 
   constructor() {
@@ -96,12 +96,20 @@ export class UploadPageComponent {
     this.uploadMessage = 'Configurazione GitHub salvata.';
   }
 
+  toggleGithubConfig(): void {
+    this.showGithubConfig = !this.showGithubConfig;
+  }
+
   removeQueued(index: number): void {
     this.queuedFiles = this.queuedFiles.filter((_, idx) => idx !== index);
   }
 
   async uploadAll(): Promise<void> {
-    if (!this.queuedFiles.length || this.uploadForm.invalid || this.githubForm.invalid) {
+    this.submitAttempted = true;
+    this.uploadForm.markAllAsTouched();
+    this.githubForm.markAllAsTouched();
+
+    if (!this.canPublish) {
       this.uploadMessage = 'Compila i campi e aggiungi almeno un file.';
       return;
     }
@@ -116,7 +124,6 @@ export class UploadPageComponent {
       try {
         const payload = {
           platform: String(formValue.platform || ''),
-          line: String(formValue.line || ''),
           docType: formValue.docType || 'terms',
           lang: String(formValue.lang || 'it'),
           effectiveDate: String(formValue.effectiveDate || ''),
@@ -151,19 +158,11 @@ export class UploadPageComponent {
     try {
       const cfg = await firstValueFrom(this.configApi.getInfraConfig());
       this.platformOptions = cfg.platforms || [];
-      this.lineOptions = cfg.lines || [];
-      if (this.lineOptions.length) {
-        this.uploadForm.controls.line.enable({ emitEvent: false });
-      } else {
-        this.uploadForm.controls.line.disable({ emitEvent: false });
-      }
       this.langOptions = cfg.languages?.length ? cfg.languages : this.langOptions;
       const firstPlatform = this.platformOptions[0]?.id || '';
       this.uploadForm.patchValue({ platform: firstPlatform });
     } catch {
       this.platformOptions = [];
-      this.lineOptions = [];
-      this.uploadForm.controls.line.disable({ emitEvent: false });
       this.uploadForm.patchValue({ platform: '' });
     }
   }
@@ -184,5 +183,23 @@ export class UploadPageComponent {
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(file);
     });
+  }
+
+  get canPublish(): boolean {
+    return !this.loading && this.uploadForm.valid && this.githubForm.valid && this.queuedFiles.length > 0;
+  }
+
+  hasUploadError(controlName: string): boolean {
+    const control = this.uploadForm.get(controlName) as AbstractControl | null;
+    return Boolean(control?.invalid && (control.touched || this.submitAttempted));
+  }
+
+  hasGithubError(controlName: string): boolean {
+    const control = this.githubForm.get(controlName) as AbstractControl | null;
+    return Boolean(control?.invalid && (control.touched || this.submitAttempted));
+  }
+
+  get filesMissing(): boolean {
+    return this.submitAttempted && this.queuedFiles.length === 0;
   }
 }

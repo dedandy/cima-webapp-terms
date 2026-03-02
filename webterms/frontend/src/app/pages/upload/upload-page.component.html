@@ -9,46 +9,53 @@
 
   <section class="card border-0 shadow-sm mb-4">
     <div class="card-body">
-      <h2 class="h5 mb-3">Configurazione GitHub</h2>
-      <form [formGroup]="githubForm" class="row g-3">
-        <div class="col-12 col-lg-6">
-          <label class="form-label">Manifest URL pubblico</label>
-          <input class="form-control" formControlName="manifestUrl" />
-        </div>
-        <div class="col-12 col-lg-6">
-          <label class="form-label">GitHub token (repo write)</label>
-          <input class="form-control" type="password" formControlName="githubToken" />
-        </div>
-        <div class="col-12 col-md-4">
-          <label class="form-label">Repo owner</label>
-          <input class="form-control" formControlName="repoOwner" />
-        </div>
-        <div class="col-12 col-md-4">
-          <label class="form-label">Repo name</label>
-          <input class="form-control" formControlName="repoName" />
-        </div>
-        <div class="col-12 col-md-4">
-          <label class="form-label">Branch</label>
-          <input class="form-control" formControlName="branch" />
-        </div>
-        <div class="col-12 col-md-4">
-          <label class="form-label">Documents root path</label>
-          <input class="form-control" formControlName="documentsRootPath" />
-        </div>
-        <div class="col-12 col-md-4">
-          <label class="form-label">Manifest path</label>
-          <input class="form-control" formControlName="manifestPath" />
-        </div>
-        <div class="col-12 col-md-4">
-          <label class="form-label">Public base URL</label>
-          <input class="form-control" formControlName="publicBaseUrl" />
-        </div>
-      </form>
-      <div class="mt-3">
-        <button class="btn btn-outline-secondary btn-sm" (click)="saveGithubSettings()">
-          Salva configurazione
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h5 mb-0">Configurazione GitHub</h2>
+        <button class="btn btn-outline-secondary btn-sm" type="button" (click)="toggleGithubConfig()">
+          {{ showGithubConfig ? 'Nascondi' : 'Mostra' }} configurazione
         </button>
       </div>
+      @if (showGithubConfig) {
+        <form [formGroup]="githubForm" class="row g-3">
+          <div class="col-12 col-lg-6">
+            <label class="form-label">Manifest URL pubblico</label>
+            <input class="form-control" [class.is-invalid]="hasGithubError('manifestUrl')" formControlName="manifestUrl" />
+          </div>
+          <div class="col-12 col-lg-6">
+            <label class="form-label">GitHub token (repo write)</label>
+            <input class="form-control" [class.is-invalid]="hasGithubError('githubToken')" type="password" formControlName="githubToken" />
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label">Repo owner</label>
+            <input class="form-control" [class.is-invalid]="hasGithubError('repoOwner')" formControlName="repoOwner" />
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label">Repo name</label>
+            <input class="form-control" [class.is-invalid]="hasGithubError('repoName')" formControlName="repoName" />
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label">Branch</label>
+            <input class="form-control" [class.is-invalid]="hasGithubError('branch')" formControlName="branch" />
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label">Documents root path</label>
+            <input class="form-control" [class.is-invalid]="hasGithubError('documentsRootPath')" formControlName="documentsRootPath" />
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label">Manifest path</label>
+            <input class="form-control" [class.is-invalid]="hasGithubError('manifestPath')" formControlName="manifestPath" />
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label">Public base URL</label>
+            <input class="form-control" [class.is-invalid]="hasGithubError('publicBaseUrl')" formControlName="publicBaseUrl" />
+          </div>
+        </form>
+        <div class="mt-3">
+          <button class="btn btn-outline-secondary btn-sm" type="button" (click)="saveGithubSettings()">
+            Salva configurazione
+          </button>
+        </div>
+      }
     </div>
   </section>
 
@@ -59,46 +66,38 @@
       <form [formGroup]="uploadForm" class="row g-3 mb-3">
         <div class="col-12 col-md-3">
           <label class="form-label">Piattaforma</label>
-          <select class="form-select" formControlName="platform">
+          <select class="form-select" [class.is-invalid]="hasUploadError('platform')" formControlName="platform">
             @for (platform of platformOptions; track platform.id) {
               <option [value]="platform.id">{{ platform.label }}</option>
             }
           </select>
         </div>
         <div class="col-12 col-md-3">
-          <label class="form-label">Linea</label>
-          <select class="form-select" formControlName="line">
-            <option value="">-</option>
-            @for (line of lineOptions; track line) {
-              <option [value]="line">{{ line }}</option>
-            }
-          </select>
-        </div>
-        <div class="col-12 col-md-2">
           <label class="form-label">Tipo</label>
-          <select class="form-select" formControlName="docType">
+          <select class="form-select" [class.is-invalid]="hasUploadError('docType')" formControlName="docType">
             <option value="terms">terms</option>
             <option value="privacy">privacy</option>
             <option value="cookie">cookie</option>
           </select>
         </div>
-        <div class="col-12 col-md-2">
+        <div class="col-12 col-md-3">
           <label class="form-label">Lingua</label>
-          <select class="form-select" formControlName="lang">
+          <select class="form-select" [class.is-invalid]="hasUploadError('lang')" formControlName="lang">
             @for (lang of langOptions; track lang) {
               <option [value]="lang">{{ lang }}</option>
             }
           </select>
         </div>
-        <div class="col-12 col-md-2">
+        <div class="col-12 col-md-3">
           <label class="form-label">Data efficacia</label>
-          <input class="form-control" type="date" formControlName="effectiveDate" />
+          <input class="form-control" [class.is-invalid]="hasUploadError('effectiveDate')" type="date" formControlName="effectiveDate" />
         </div>
       </form>
 
       <div
         class="dropzone mb-3"
         [class.active]="dragActive"
+        [class.is-invalid]="filesMissing"
         (drop)="onDrop($event)"
         (dragover)="onDragOver($event)"
         (dragleave)="onDragLeave($event)"
@@ -107,6 +106,9 @@
         <input id="picker" class="d-none" type="file" multiple (change)="onPickFiles($event)" />
         <label for="picker" class="btn btn-outline-primary btn-sm">Seleziona file</label>
       </div>
+      @if (filesMissing) {
+        <p class="small text-danger mt-n2 mb-3">Seleziona almeno un file.</p>
+      }
 
       <div class="mb-3" *ngIf="queuedFiles.length; else noFiles">
         <div class="small text-secondary mb-2">{{ queuedFiles.length }} file in coda</div>
@@ -121,7 +123,7 @@
       </div>
       <ng-template #noFiles><p class="small text-secondary mb-3">Nessun file selezionato.</p></ng-template>
 
-      <button class="btn btn-primary" [disabled]="loading" (click)="uploadAll()">
+      <button class="btn btn-primary" [disabled]="!canPublish" (click)="uploadAll()">
         {{ loading ? 'Pubblicazione in corso...' : 'Pubblica file in coda' }}
       </button>
 
